@@ -1,98 +1,282 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Dimensions,
+  ImageBackground,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+/* ===== BACKGROUND ===== */
+const bgImage = require("../../assets/images/bg.png");
+const { width } = Dimensions.get("window");
 
-export default function HomeScreen() {
+/* ===== GRID CARD SIZE ===== */
+const CARD_SIZE = (width - 16 * 2 - 14) / 2;
+
+export default function DashboardScreen() {
+  const router = useRouter();
+
+  const [loading, setLoading] = useState(true);
+  const [userName, setUserName] = useState("");
+  const [designation, setDesignation] = useState("");
+  const [department, setDepartment] = useState("");
+
+  useEffect(() => {
+    loadUserDetails();
+  }, []);
+
+  const loadUserDetails = async () => {
+    try {
+      setLoading(true);
+
+      const [
+        username,
+        designationName,
+        departmentName,
+      ] = await Promise.all([
+        AsyncStorage.getItem("username"),
+        AsyncStorage.getItem("designationName"),
+        AsyncStorage.getItem("departmentName"),
+      ]);
+
+      setUserName(username || "User");
+      setDesignation(designationName || "");
+      setDepartment(departmentName || "");
+    } catch (err) {
+      console.log("Dashboard load error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <SafeAreaView style={styles.safe}>
+      <ImageBackground source={bgImage} style={styles.bg} resizeMode="cover">
+        <View style={styles.overlay} />
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+        {/* ================= BEAUTIFUL TOP PROFILE ================= */}
+        <View style={styles.profileWrapper}>
+          <View style={styles.profileCard}>
+            {loading ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <>
+                {/* AVATAR */}
+                <View style={styles.avatarOuter}>
+                  <Ionicons
+                    name="person"
+                    size={42}
+                    color="#ffffff"
+                  />
+                </View>
+
+                {/* USER INFO */}
+                <View style={styles.profileText}>
+                  <Text style={styles.welcomeText}>Welcome back 👋</Text>
+                  <Text style={styles.nameText}>{userName}</Text>
+
+                  {(designation || department) && (
+                    <Text style={styles.roleText}>
+                      {designation}
+                      {designation && department ? " • " : ""}
+                      {department}
+                    </Text>
+                  )}
+                </View>
+
+                {/* LOGOUT */}
+                <TouchableOpacity
+                  onPress={() => router.replace("/(auth)/login")}
+                  style={styles.logoutBtn}
+                >
+                  <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+
+        {/* ================= DASHBOARD GRID ================= */}
+        <ScrollView contentContainerStyle={styles.container}>
+          <View style={styles.grid}>
+            <SquareButton
+              icon={<MaterialCommunityIcons name="radar" size={28} color="#16A34A" />}
+              label="A-Track"
+              onPress={() => router.push("/(tabs)/a-track")}
+            />
+
+            <SquareButton
+              icon={<Ionicons name="call-outline" size={28} color="#7C3AED" />}
+              label="Call Entry"
+              onPress={() => router.push("/(tabs)/call-entry")}
+            />
+
+            <SquareButton
+              icon={<Ionicons name="cube-outline" size={28} color="#F97316" />}
+              label="Shipment Details"
+              onPress={() => router.push("/(tabs)/shipment-details")}
+            />
+
+            <SquareButton
+              icon={<Ionicons name="people-outline" size={28} color="#DB2777" />}
+              label="Customers Outstanding"
+              onPress={() => router.push("/(tabs)/customers")}
+            />
+
+            <SquareButton
+              icon={<MaterialCommunityIcons name="ship-wheel" size={28} color="#0284C7" />}
+              label="Sea Tariff"
+              onPress={() => router.push("/(tabs)/sea-tariff")}
+            />
+          </View>
+        </ScrollView>
+      </ImageBackground>
+    </SafeAreaView>
   );
 }
 
+/* ================= GRID BUTTON ================= */
+
+function SquareButton({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={styles.card}
+      onPress={onPress}
+      activeOpacity={0.85}
+    >
+      <View style={styles.iconCircle}>{icon}</View>
+      <Text style={styles.cardText}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+/* ================= STYLES ================= */
+
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  safe: { flex: 1, backgroundColor: "#0f0b0bff" },
+  bg: { flex: 1 },
+
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.45)",
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+
+  /* ===== PROFILE ===== */
+  profileWrapper: {
+    paddingHorizontal: 16,
+    paddingTop: 32,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+
+  profileCard: {
+    backgroundColor: "#1e293b",
+    borderRadius: 24,
+    padding: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 14,
+    elevation: 10,
+  },
+
+  avatarOuter: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#2563EB",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  profileText: {
+    flex: 1,
+    marginLeft: 14,
+  },
+
+  welcomeText: {
+    fontSize: 13,
+    color: "#cbd5f5",
+    marginBottom: 2,
+  },
+
+  nameText: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#ffffff",
+  },
+
+  roleText: {
+    fontSize: 13,
+    color: "#94a3b8",
+    marginTop: 2,
+  },
+
+  logoutBtn: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: "#0f172a",
+  },
+
+  /* ===== GRID ===== */
+  container: {
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+    marginTop: 12,
+  },
+
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+  },
+
+  card: {
+    width: CARD_SIZE,
+    height: CARD_SIZE,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    marginBottom: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+
+  iconCircle: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: "rgba(0,0,0,0.06)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+
+  cardText: {
+    fontSize: 14,
+    fontWeight: "600",
+    textAlign: "center",
+    color: "#1F2937",
+    paddingHorizontal: 6,
   },
 });
