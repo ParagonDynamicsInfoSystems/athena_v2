@@ -1,25 +1,21 @@
 import { Ionicons } from "@expo/vector-icons";
-import axios from "axios";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-    ActivityIndicator,
-    ImageBackground,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  ImageBackground,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
+import erpApi from "../hooks/erpApi";
 
 /* ===== BACKGROUND ===== */
 const bgImage = require("../../assets/images/bg.png");
-
-/* ===== BACKEND URL ===== */
-const BASE_URL =
-  "https://erp.athena-logistics.com:8080/Athena/app/master/mabl/synccard";
 
 /* ===== SEARCH OPTIONS ===== */
 const SEARCH_OPTIONS = [
@@ -54,7 +50,7 @@ export default function TrackShipmentScreen() {
           ? { mbldocno: value.trim(), containerno: "", type: "bookingNo" }
           : { mbldocno: "", containerno: value.trim(), type: "containerNo" };
 
-      const res = await axios.get(BASE_URL, { params });
+      const res = await erpApi.get("/Athena/app/master/mabl/synccard", { params });
       const d = res.data;
 
       if (!d) return;

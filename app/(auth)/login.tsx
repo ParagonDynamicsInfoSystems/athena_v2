@@ -1,5 +1,4 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import axios from "axios";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -13,12 +12,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import erpApi from "../hooks/erpApi";
 
 const bgImage = require("../../assets/images/bg.png");
-
-// ✅ EXACT API (as provided)
-const LOGIN_URL =
-  "https://erp.athena-logistics.com:8080/Athena/feeder/mobileApp/mobilelogin";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -38,20 +34,17 @@ export default function LoginScreen() {
       setLoading(true);
 
       console.log("LOGIN REQUEST:", {
-        url: LOGIN_URL,
         username: empId.toUpperCase(),
       });
 
-      const response = await axios.post(
-        LOGIN_URL,
+      const response = await erpApi.post(
+        "/Athena/feeder/mobileApp/mobilelogin",
         {
           username: empId.toUpperCase(), // SAME as Angular
           password: password,
         },
         {
           headers: {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
             "X-Requested-With": "XMLHttpRequest", // important
           },
           timeout: 15000,

@@ -1,5 +1,4 @@
 import { Ionicons } from "@expo/vector-icons";
-import axios from "axios";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -14,13 +13,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import erpApi from "../hooks/erpApi";
 
 /* ===== BACKGROUND ===== */
 const bgImage = require("../../assets/images/bg.png");
-
-/* ===== EXACT BACKEND ===== */
-const BASE_URL =
-  "https://erp.athena-logistics.com:8080/Athena/feeder/mobileApp";
 
 /* ===== SEARCH OPTIONS ===== */
 const SEARCH_OPTIONS = [
@@ -53,7 +49,7 @@ export default function ATrackScreen() {
       setLoading(true);
       setTracking(null);
 
-      const response = await axios.get(`${BASE_URL}/getTracking`, {
+      const response = await erpApi.get("/Athena/feeder/mobileApp/getTracking", {
         params: {
           trackingNo: trackingNo.trim(),
           trackingBy: searchBy.code,

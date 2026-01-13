@@ -1,6 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import axios from "axios";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -13,13 +12,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import aiApi from "../hooks/aiApi";
 
 /* ===== BACKGROUND ===== */
 const bgImage = require("../../assets/images/bg.png");
-
-/* ===== CRM API ===== */
-const CRM_CUSTOMERS_URL =
-  "https://sailwithcrm-athena.reportqube.com/api/crm_data/customer-outstandings";
 
 type Customer = {
   cust_name: string;
@@ -47,7 +43,7 @@ export default function CustomersScreen() {
         return;
       }
 
-      const response = await axios.get(CRM_CUSTOMERS_URL, {
+      const response = await aiApi.get("/crm_data/customer-outstandings", {
         params: { user_id: crmUserId },
       });
 

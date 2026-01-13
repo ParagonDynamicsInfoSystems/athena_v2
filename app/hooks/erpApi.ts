@@ -8,6 +8,43 @@ const erpApi = axios.create({
   },
 });
 
+// Helper function to generate curl command
+const generateCurlCommand = (config: any) => {
+  const baseURL = config.baseURL || "";
+  const url = config.url || "";
+  let fullUrl = url.startsWith("http") ? url : `${baseURL}${url}`;
+  const method = (config.method || "GET").toUpperCase();
+  
+  // Add params to URL
+  if (config.params) {
+    const params = new URLSearchParams(config.params).toString();
+    if (params) {
+      fullUrl += `${fullUrl.includes("?") ? "&" : "?"}${params}`;
+    }
+  }
+  
+  let curl = `curl -X ${method} "${fullUrl}"`;
+  
+  // Add headers
+  if (config.headers) {
+    Object.entries(config.headers).forEach(([key, value]) => {
+      if (key.toLowerCase() !== "content-length") {
+        curl += ` \\\n  -H "${key}: ${value}"`;
+      }
+    });
+  }
+  
+  // Add data for POST/PUT/PATCH
+  if (config.data && (method === "POST" || method === "PUT" || method === "PATCH")) {
+    const dataStr = typeof config.data === "string" 
+      ? config.data 
+      : JSON.stringify(config.data);
+    curl += ` \\\n  -d '${dataStr}'`;
+  }
+  
+  return curl;
+};
+
 // Request interceptor for logging
 erpApi.interceptors.request.use((config) => {
   console.log("ERP API REQUEST:", {
@@ -30,12 +67,26 @@ erpApi.interceptors.response.use(
     return response;
   },
   (error) => {
-    console.error("ERP API ERROR:", {
-      url: error.config?.url,
+    const config = error.config || {};
+    
+    // Generate and print curl command
+    const curlCommand = generateCurlCommand(config);
+    console.error("=".repeat(80));
+    console.error("ERP API ERROR - CURL COMMAND:");
+    console.error(curlCommand);
+    console.error("=".repeat(80));
+    
+    // Print error response
+    console.error("ERP API ERROR RESPONSE:", {
+      url: config.url,
+      method: config.method,
       status: error.response?.status,
+      statusText: error.response?.statusText,
       message: error.message,
-      data: error.response?.data,
+      responseData: error.response?.data,
+      responseHeaders: error.response?.headers,
     });
+    
     return Promise.reject(error);
   }
 );
