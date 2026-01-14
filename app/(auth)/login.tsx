@@ -16,8 +16,8 @@ import {
 import AIApi from "../hooks/aiApi";
 import erpApi from "../hooks/erpApi";
 
-
 // 🔔 Notifications
+import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
@@ -42,6 +42,12 @@ async function buildDeviceName() {
 }
 
 async function getDevicePushTokenOrFetch(): Promise<string | null> {
+  // 🚫 Expo Go safeguard (SDK 53+)
+  if (Constants.appOwnership === "expo") {
+    console.log("🚫 Skipping push token (Expo Go)");
+    return null;
+  }
+
   const stored = await SecureStore.getItemAsync(SECURE_KEYS.devicePushToken);
   if (stored) return stored;
 
@@ -50,6 +56,7 @@ async function getDevicePushTokenOrFetch(): Promise<string | null> {
     const token = (res as any)?.data ?? null;
 
     if (token) {
+      console.log("🔔 Device push token:", token);
       await SecureStore.setItemAsync(SECURE_KEYS.devicePushToken, token);
     }
     return token;
@@ -65,7 +72,7 @@ function getDeviceType() {
   return "unknown";
 }
 
-async function registerNotificationToken() {
+async function registerNotificationToken(userId: string) {
   try {
     const device_token = await getDevicePushTokenOrFetch();
     if (!device_token) return;
@@ -76,8 +83,12 @@ async function registerNotificationToken() {
       device_type: getDeviceType(),
     };
 
-    await AIApi.post("/notifications/register-token", payload);
-    console.log("✅ Notification token registered");
+    await AIApi.post(
+      `/notifications/register-token?user_id=${encodeURIComponent(userId)}`,
+      payload
+    );
+
+    console.log("✅ Notification token registered for user:", userId);
   } catch (e) {
     console.warn("❌ Failed to register notification token", e);
   }
@@ -116,10 +127,6 @@ export default function LoginScreen() {
     try {
       setLoading(true);
 
-      console.log("LOGIN REQUEST:", {
-        username: empId.toUpperCase(),
-      });
-
       const response = await erpApi.post(
         "/Athena/feeder/mobileApp/mobilelogin",
         {
@@ -127,17 +134,13 @@ export default function LoginScreen() {
           password: password,
         },
         {
-          headers: {
-            "X-Requested-With": "XMLHttpRequest",
-          },
+          headers: { "X-Requested-With": "XMLHttpRequest" },
           timeout: 15000,
         }
       );
 
-      console.log("LOGIN RESPONSE:", response.data);
       const result = response.data;
 
-      // ✅ SAME SUCCESS CHECK AS ANGULAR
       if (result && result.success === true) {
         const user = result.userDetail;
 
@@ -151,8 +154,8 @@ export default function LoginScreen() {
           ["departmentName", user.departmentName ?? ""],
         ]);
 
-        // 🔔 SAVE NOTIFICATION TOKEN AFTER LOGIN
-        await registerNotificationToken();
+        // 🔔 Register token with logged-in user
+        await registerNotificationToken(user.userId);
 
         router.replace("/(tabs)");
       } else {
@@ -162,9 +165,6 @@ export default function LoginScreen() {
         );
       }
     } catch (error: any) {
-      console.log("LOGIN ERROR FULL:", error);
-      console.log("LOGIN ERROR RESPONSE:", error?.response?.data);
-
       Alert.alert(
         "Login Error",
         error?.response?.data?.message ||
@@ -183,7 +183,6 @@ export default function LoginScreen() {
         <View style={styles.card}>
           <Text style={styles.title}>Login</Text>
 
-          {/* USER NAME */}
           <Text style={styles.label}>User name</Text>
           <TextInput
             placeholder="User name"
@@ -193,7 +192,6 @@ export default function LoginScreen() {
             onChangeText={setEmpId}
           />
 
-          {/* PASSWORD */}
           <Text style={styles.label}>Password</Text>
           <View style={styles.passwordRow}>
             <TextInput
@@ -210,12 +208,10 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* LOGIN BUTTON */}
           <TouchableOpacity
             style={styles.button}
             onPress={handleLogin}
             disabled={loading}
-            activeOpacity={0.85}
           >
             {loading ? (
               <ActivityIndicator color="#fff" />
