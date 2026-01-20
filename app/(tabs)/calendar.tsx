@@ -99,7 +99,7 @@ export default function CalendarScreen() {
       const calendar = resp.data?.calendar_meetings || {};
       const data = Array.isArray(calendar[key]) ? calendar[key] : [];
       setMeetings(data);
-    } catch (err) {
+    } catch {
       setMeetings([]);
     } finally {
       setLoading(false);
@@ -138,6 +138,15 @@ export default function CalendarScreen() {
       { text: "Cancel", style: "cancel" },
       { text: "Delete", style: "destructive", onPress: () => deleteMeeting(postPlanId, prePlanId) },
     ]);
+  };
+
+  /* ================= MAIL NAVIGATION ================= */
+  const openMailDraft = (postPlanId?: string) => {
+    if (!postPlanId) return;
+    router.push({
+      pathname: "/mail-draft",
+      params: { post_plan_id: String(postPlanId) },
+    });
   };
 
   return (
@@ -192,24 +201,6 @@ export default function CalendarScreen() {
             </ScrollView>
           </View>
 
-          {/* QUICK ACTIONS */}
-          <View style={styles.actionButtonContainer}>
-            <Pressable
-              style={[styles.quickActionBtn, { backgroundColor: "#1E4DB3" }]}
-              onPress={() => router.push({ pathname: "/(tabs)/add-plan-screen", params: { date: getKey(selectedDate) } })}
-            >
-              <Ionicons name="add-circle-outline" size={20} color="#fff" />
-              <Text style={styles.quickActionText}>Add Plan</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.quickActionBtn, { backgroundColor: "#051539" }]}
-              onPress={() => router.push({ pathname: "/(tabs)/meeting-entry" })}
-            >
-              <Ionicons name="videocam-outline" size={20} color="#fff" />
-              <Text style={styles.quickActionText}>Add Meeting</Text>
-            </Pressable>
-          </View>
-
           {/* CONTENT */}
           <View style={styles.content}>
             {loading ? (
@@ -225,29 +216,47 @@ export default function CalendarScreen() {
               <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
                 {meetings.map((m, index) => (
                   <View
-                    key={`${m.pre_plan_id ?? 'pre'}-${m.post_plan_id ?? 'post'}-${index}`}
+                    key={`${m.pre_plan_id ?? "pre"}-${m.post_plan_id ?? "post"}-${index}`}
                     style={[styles.card, getCardStyle(m.callstatus)]}
                   >
                     <View style={styles.cardHeader}>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.customer} numberOfLines={1}>{m.customer}</Text>
-                        <Text style={styles.customerIdText}>ID: {m.customer_id} • {m.activity || "Task"}</Text>
+                        <Text style={styles.customerIdText}>
+                          ID: {m.customer_id} • {m.activity || "Task"}
+                        </Text>
                       </View>
-                      
+
                       <View style={styles.badgeRow}>
+                        {m.post_plan_id && (
+                          <Pressable
+                            style={styles.mailIconBtn}
+                            onPress={() => openMailDraft(m.post_plan_id)}
+                          >
+                            <Ionicons name="mail-outline" size={14} color="#1E4DB3" />
+                          </Pressable>
+                        )}
+
                         {m.ai_generated === true && (
                           <View style={styles.aiBadge}>
                             <Ionicons name="sparkles" size={10} color="#7C3AED" />
                             <Text style={styles.aiText}>AI</Text>
                           </View>
                         )}
+
                         <View style={[styles.statusBadge, getStatusBadgeStyle(m.callstatus)]}>
-                          <Text style={styles.statusText}>{m.callstatus?.toUpperCase() || "PLAN"}</Text>
+                          <Text style={styles.statusText}>
+                            {m.callstatus?.toUpperCase() || "PLAN"}
+                          </Text>
                         </View>
                       </View>
                     </View>
 
-                    {m.description && <Text style={styles.descriptionText} numberOfLines={2}>{m.description}</Text>}
+                    {m.description && (
+                      <Text style={styles.descriptionText} numberOfLines={2}>
+                        {m.description}
+                      </Text>
+                    )}
 
                     <View style={styles.divider} />
 
@@ -255,13 +264,19 @@ export default function CalendarScreen() {
                       <View style={styles.metaRow}>
                         <Ionicons name="time-outline" size={16} color="#64748B" />
                         <Text style={styles.metaText}>
-                          {m.plan_time || (m.from_time ? `${m.from_time.substring(0,5)} - ${m.to_time.substring(0,5)}` : "Not Scheduled")}
+                          {m.plan_time ||
+                            (m.from_time
+                              ? `${m.from_time.substring(0, 5)} - ${m.to_time.substring(0, 5)}`
+                              : "Not Scheduled")}
                         </Text>
                       </View>
                       <View style={styles.metaRow}>
-                        <Ionicons 
-                          name={m.plan_mode?.toLowerCase() === 'online' ? "videocam-outline" : "location-outline"} 
-                          size={16} color="#64748B" 
+                        <Ionicons
+                          name={m.plan_mode?.toLowerCase() === "online"
+                            ? "videocam-outline"
+                            : "location-outline"}
+                          size={16}
+                          color="#64748B"
                         />
                         <Text style={styles.metaText}>{m.plan_mode || "Physical"}</Text>
                       </View>
@@ -272,15 +287,25 @@ export default function CalendarScreen() {
                         <View style={styles.actionRow}>
                           <Pressable
                             style={styles.editBtn}
-                            onPress={() => router.push({
-                              pathname: "/(tabs)/add-plan-screen",
-                              params: { pre_plan_id: String(m.pre_plan_id ?? ""), meeting: JSON.stringify(m), date: getKey(selectedDate) },
-                            })}
+                            onPress={() =>
+                              router.push({
+                                pathname: "/(tabs)/add-plan-screen",
+                                params: {
+                                  pre_plan_id: String(m.pre_plan_id ?? ""),
+                                  meeting: JSON.stringify(m),
+                                  date: getKey(selectedDate),
+                                },
+                              })
+                            }
                           >
                             <Ionicons name="create-outline" size={18} color="#1E4DB3" />
                             <Text style={styles.editText}>Edit Plan</Text>
                           </Pressable>
-                          <Pressable style={styles.deleteBtn} onPress={() => handleDelete(m.post_plan_id, m.pre_plan_id)}>
+
+                          <Pressable
+                            style={styles.deleteBtn}
+                            onPress={() => handleDelete(m.post_plan_id, m.pre_plan_id)}
+                          >
                             <Ionicons name="trash-outline" size={18} color="#DC2626" />
                           </Pressable>
                         </View>
@@ -289,10 +314,18 @@ export default function CalendarScreen() {
                       {m.callstatus?.toLowerCase() === "not met" && (
                         <Pressable
                           style={styles.convertBtn}
-                          onPress={() => router.push({
-                            pathname: "/(tabs)/meeting-entry",
-                            params: { meetingDate: getKey(selectedDate), postPlanId: m.post_plan_id, pre_plan_id: m.pre_plan_id ?? "", customer_id: m.customer_id ?? "", meeting: JSON.stringify(m) },
-                          })}
+                          onPress={() =>
+                            router.push({
+                              pathname: "/(tabs)/meeting-entry",
+                              params: {
+                                meetingDate: getKey(selectedDate),
+                                postPlanId: m.post_plan_id,
+                                pre_plan_id: m.pre_plan_id ?? "",
+                                customer_id: m.customer_id ?? "",
+                                meeting: JSON.stringify(m),
+                              },
+                            })
+                          }
                         >
                           <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
                           <Text style={styles.convertText}>Check-in Meeting</Text>
@@ -313,47 +346,66 @@ export default function CalendarScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16 },
   headerBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#fff", borderRadius: 20, padding: 10, marginBottom: 20, elevation: 2 },
-  headerTitle: { fontSize: 18, fontWeight: "900", color: '#051539' },
-  headerSub: { fontSize: 12, color: "#64748B", fontWeight: '700' },
+  headerTitle: { fontSize: 18, fontWeight: "900", color: "#051539" },
+  headerSub: { fontSize: 12, color: "#64748B", fontWeight: "700" },
   iconBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: "#051539", alignItems: "center", justifyContent: "center" },
+
   daysRow: { flexDirection: "row", justifyContent: "space-between" },
   dayPill: { width: 46, height: 62, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(5, 21, 57, 0.8)" },
   daySelected: { backgroundColor: "#fff", elevation: 6 },
   dayName: { fontSize: 10, color: "rgba(255,255,255,0.6)" },
   dayNumber: { fontSize: 18, fontWeight: "800", color: "#fff" },
   dayActiveText: { color: "#051539" },
-  actionButtonContainer: { flexDirection: 'row', gap: 12, marginBottom: 20 },
-  quickActionBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 14, borderRadius: 16, gap: 8, elevation: 3 },
-  quickActionText: { color: "#fff", fontWeight: "800", fontSize: 14 },
+
   content: { flex: 1, backgroundColor: "#F1F5F9", borderTopLeftRadius: 36, borderTopRightRadius: 36, padding: 20, marginHorizontal: -16, marginBottom: -16 },
-  card: { padding: 18, borderRadius: 24, marginBottom: 16, backgroundColor: "#fff", elevation: 3, borderWidth: 1, borderColor: '#E2E8F0' },
+
+  card: { padding: 18, borderRadius: 24, marginBottom: 16, backgroundColor: "#fff", elevation: 3, borderWidth: 1, borderColor: "#E2E8F0" },
   cardMet: { borderLeftWidth: 6, borderLeftColor: "#10B981" },
   cardNotMet: { borderLeftWidth: 6, borderLeftColor: "#EF4444" },
   cardDefault: { borderLeftWidth: 6, borderLeftColor: "#3B82F6" },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
-  customer: { fontSize: 17, fontWeight: "800", color: '#1E293B', flex: 1 },
-  customerIdText: { fontSize: 12, color: '#64748B', fontWeight: '600' },
-  badgeRow: { flexDirection: 'row', gap: 6, alignItems: 'center' },
+
+  cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 },
+  customer: { fontSize: 17, fontWeight: "800", color: "#1E293B", flex: 1 },
+  customerIdText: { fontSize: 12, color: "#64748B", fontWeight: "600" },
+
+  badgeRow: { flexDirection: "row", gap: 6, alignItems: "center" },
+  mailIconBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: "#EFF6FF",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#DBEAFE",
+  },
+
   statusBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
   statusMet: { backgroundColor: "#DCFCE7" },
   statusNotMet: { backgroundColor: "#FEE2E2" },
   statusDefault: { backgroundColor: "#E0E7FF" },
   statusText: { fontSize: 9, fontWeight: "900", color: "#1E293B" },
-  aiBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F3FF', paddingHorizontal: 7, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: '#DDD6FE' },
-  aiText: { fontSize: 9, fontWeight: '900', color: '#7C3AED', marginLeft: 3 },
-  descriptionText: { fontSize: 13, color: '#64748B', marginBottom: 10, lineHeight: 18 },
-  divider: { height: 1, backgroundColor: '#F1F5F9', marginBottom: 15 },
+
+  aiBadge: { flexDirection: "row", alignItems: "center", backgroundColor: "#F5F3FF", paddingHorizontal: 7, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: "#DDD6FE" },
+  aiText: { fontSize: 9, fontWeight: "900", color: "#7C3AED", marginLeft: 3 },
+
+  descriptionText: { fontSize: 13, color: "#64748B", marginBottom: 10, lineHeight: 18 },
+  divider: { height: 1, backgroundColor: "#F1F5F9", marginBottom: 15 },
+
   metaContainer: { gap: 8, marginBottom: 15 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  metaText: { fontSize: 14, color: "#475569", fontWeight: '600' },
+  metaRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  metaText: { fontSize: 14, color: "#475569", fontWeight: "600" },
+
   footerRow: { gap: 10 },
   actionRow: { flexDirection: "row", gap: 10 },
-  editBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: 'center', backgroundColor: "#EFF6FF", paddingVertical: 12, borderRadius: 14, gap: 6 },
-  deleteBtn: { width: 50, alignItems: "center", justifyContent: 'center', backgroundColor: "#FEF2F2", borderRadius: 14 },
+  editBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "#EFF6FF", paddingVertical: 12, borderRadius: 14, gap: 6 },
+  deleteBtn: { width: 50, alignItems: "center", justifyContent: "center", backgroundColor: "#FEF2F2", borderRadius: 14 },
   editText: { color: "#1E4DB3", fontWeight: "800" },
-  convertBtn: { flexDirection: "row", backgroundColor: "#059669", padding: 14, borderRadius: 16, alignItems: "center", justifyContent: 'center', gap: 8 },
+
+  convertBtn: { flexDirection: "row", backgroundColor: "#059669", padding: 14, borderRadius: 16, alignItems: "center", justifyContent: "center", gap: 8 },
   convertText: { fontWeight: "800", color: "#fff" },
-  emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60 },
-  emptyIconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
-  empty: { color: "#94A3B8", fontWeight: '700', fontSize: 16 },
+
+  emptyWrap: { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 60 },
+  emptyIconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: "#E2E8F0", alignItems: "center", justifyContent: "center", marginBottom: 16 },
+  empty: { color: "#94A3B8", fontWeight: "700", fontSize: 16 },
 });

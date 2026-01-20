@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
 import aiApi from "../hooks/aiApi";
 import erpApi from "../hooks/erpApi";
 
@@ -21,6 +22,10 @@ import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
+
+// 🌐 OAuth helpers
+import * as AuthSession from "expo-auth-session";
+import * as WebBrowser from "expo-web-browser";
 
 const bgImage = require("../../assets/images/bg.png");
 
@@ -42,11 +47,7 @@ async function buildDeviceName() {
 }
 
 async function getDevicePushTokenOrFetch(): Promise<string | null> {
-  // 🚫 Expo Go safeguard (SDK 53+)
-  if (Constants.appOwnership === "expo") {
-    console.log("🚫 Skipping push token (Expo Go)");
-    return null;
-  }
+  if (Constants.appOwnership === "expo") return null;
 
   const stored = await SecureStore.getItemAsync(SECURE_KEYS.devicePushToken);
   if (stored) return stored;
@@ -54,14 +55,11 @@ async function getDevicePushTokenOrFetch(): Promise<string | null> {
   try {
     const res = await Notifications.getDevicePushTokenAsync();
     const token = (res as any)?.data ?? null;
-
     if (token) {
-      console.log("🔔 Device push token:", token);
       await SecureStore.setItemAsync(SECURE_KEYS.devicePushToken, token);
     }
     return token;
-  } catch (e) {
-    console.warn("❌ Failed to get device push token", e);
+  } catch {
     return null;
   }
 }
@@ -77,20 +75,85 @@ async function registerNotificationToken(userId: string) {
     const device_token = await getDevicePushTokenOrFetch();
     if (!device_token) return;
 
-    const payload = {
-      device_name: await buildDeviceName(),
-      device_token,
-      device_type: getDeviceType(),
-    };
-
     await aiApi.post(
       `/notifications/register-token?user_id=${encodeURIComponent(userId)}`,
-      payload
+      {
+        device_name: await buildDeviceName(),
+        device_token,
+        device_type: getDeviceType(),
+      }
+    );
+  } catch (e) {
+    console.warn("Notification token registration failed", e);
+  }
+}
+
+/* ================= EMAIL-AI OAUTH ================= */
+
+async function openOAuthInApp(authUrl: string, router: any) {
+  try {
+    const redirectUri = AuthSession.makeRedirectUri({ useProxy: true });
+    await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
+  } catch (e) {
+    console.warn("OAuth error", e);
+  } finally {
+    try {
+      await WebBrowser.dismissBrowser();
+    } catch {}
+    router.replace("/(tabs)");
+  }
+}
+
+async function handleEmailAiFlow(userId: string, router: any) {
+  try {
+    const res = await aiApi.get(
+      `/preferences/is-onboarded?user_id=${encodeURIComponent(userId)}`
     );
 
-    console.log("✅ Notification token registered for user:", userId);
+    const data = res.data;
+
+    if (data.google_services_connected || data.outlook_services_connected) {
+      router.replace("/(tabs)");
+      return;
+    }
+
+    Alert.alert(
+      "Customize Email",
+      "Which mail do you want to authorize to customize mail for you?",
+      [
+        {
+          text: "Google",
+          onPress: async () => {
+            const g = await aiApi.get(
+              `/email-ai/auth/google?user_id=${encodeURIComponent(userId)}`
+            );
+            if (g?.data?.url) {
+              await openOAuthInApp(g.data.url, router);
+            }
+          },
+        },
+        {
+          text: "Outlook",
+          onPress: async () => {
+            const o = await aiApi.get(
+              `/email-ai/auth/outlook?user_id=${encodeURIComponent(userId)}`
+            );
+            if (o?.data?.url) {
+              await openOAuthInApp(o.data.url, router);
+            }
+          },
+        },
+        {
+          text: "Skip",
+          style: "cancel",
+          onPress: () => router.replace("/(tabs)"),
+        },
+      ],
+      { cancelable: false }
+    );
   } catch (e) {
-    console.warn("❌ Failed to register notification token", e);
+    console.warn("Email-AI flow failed", e);
+    router.replace("/(tabs)");
   }
 }
 
@@ -102,22 +165,33 @@ export default function LoginScreen() {
   const [empId, setEmpId] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [booting, setBooting] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
 
-  // 🔔 Request notification permission once
+  /* 🔁 AUTO LOGIN */
   useEffect(() => {
-    (async () => {
+    const autoLogin = async () => {
       try {
-        const { status } = await Notifications.requestPermissionsAsync();
-        if (status !== "granted") {
-          console.log("🔕 Notification permission not granted");
+        const isLoggedIn = await AsyncStorage.getItem("isloggedIn");
+        const userId = await AsyncStorage.getItem("userId");
+
+        if (isLoggedIn === "true" && userId) {
+          await registerNotificationToken(userId);
+          router.replace("/(tabs)");
+          return;
         }
-      } catch (e) {
-        console.warn("Notification permission error", e);
+      } finally {
+        setBooting(false);
       }
-    })();
+    };
+    autoLogin();
   }, []);
 
+  useEffect(() => {
+    Notifications.requestPermissionsAsync().catch(() => {});
+  }, []);
+
+  /* 🔐 LOGIN */
   const handleLogin = async () => {
     if (!empId || !password) {
       Alert.alert("Error", "Please enter user name and password");
@@ -131,17 +205,13 @@ export default function LoginScreen() {
         "/Athena/feeder/mobileApp/mobilelogin",
         {
           username: empId.toUpperCase(),
-          password: password,
-        },
-        {
-          headers: { "X-Requested-With": "XMLHttpRequest" },
-          timeout: 15000,
+          password,
         }
       );
 
       const result = response.data;
 
-      if (result && result.success === true) {
+      if (result?.success === true) {
         const user = result.userDetail;
 
         await AsyncStorage.multiSet([
@@ -150,40 +220,39 @@ export default function LoginScreen() {
           ["username", user.username],
           ["crmUserId", empId.toUpperCase()],
           ["email", user.email],
-          ["designationName", user.designationName ?? ""],
-          ["departmentName", user.departmentName ?? ""],
         ]);
 
-        // 🔔 Register token with logged-in user
         await registerNotificationToken(user.userId);
 
-        router.replace("/(tabs)");
+        await handleEmailAiFlow(user.userId, router);
       } else {
-        Alert.alert(
-          "Login Failed",
-          result?.message || "Invalid username or password"
-        );
+        Alert.alert("Login Failed", result?.message || "Invalid credentials");
       }
-    } catch (error: any) {
+    } catch (e: any) {
       Alert.alert(
         "Login Error",
-        error?.response?.data?.message ||
-          "Unable to login. Please try again."
+        e?.response?.data?.message || "Unable to login"
       );
     } finally {
       setLoading(false);
     }
   };
 
+  /* 🚧 BOOT */
+  if (booting) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <ActivityIndicator size="large" color="#fff" />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
-      <ImageBackground source={bgImage} style={styles.bg} resizeMode="cover">
-        <View style={styles.overlay} />
-
+      <ImageBackground source={bgImage} style={styles.bg}>
         <View style={styles.card}>
           <Text style={styles.title}>Login</Text>
 
-          <Text style={styles.label}>User name</Text>
           <TextInput
             placeholder="User name"
             style={styles.input}
@@ -192,7 +261,6 @@ export default function LoginScreen() {
             onChangeText={setEmpId}
           />
 
-          <Text style={styles.label}>Password</Text>
           <View style={styles.passwordRow}>
             <TextInput
               placeholder="Password"
@@ -219,10 +287,6 @@ export default function LoginScreen() {
               <Text style={styles.buttonText}>Login</Text>
             )}
           </TouchableOpacity>
-
-          <TouchableOpacity>
-            <Text style={styles.forgot}>Forgot password?</Text>
-          </TouchableOpacity>
         </View>
       </ImageBackground>
     </SafeAreaView>
@@ -232,72 +296,26 @@ export default function LoginScreen() {
 /* ================= STYLES ================= */
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#0b0b0bff" },
+  safe: { flex: 1, backgroundColor: "#0b0b0bff", justifyContent: "center" },
   bg: { flex: 1, justifyContent: "center", paddingHorizontal: 20 },
-  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "transparent" },
-
-  card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    padding: 22,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-
-  title: {
-    fontSize: 22,
-    fontWeight: "700",
-    textAlign: "center",
-    marginBottom: 20,
-    color: "#111827",
-  },
-
-  label: {
-    fontSize: 13,
-    fontWeight: "600",
-    marginBottom: 6,
-    color: "#374151",
-  },
-
-  input: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 14,
-    fontSize: 14,
-  },
-
+  card: { backgroundColor: "#fff", borderRadius: 18, padding: 22 },
+  title: { fontSize: 22, fontWeight: "700", textAlign: "center", marginBottom: 20 },
+  input: { borderWidth: 1, borderRadius: 12, padding: 14, marginBottom: 14 },
   passwordRow: {
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#E5E7EB",
     borderRadius: 12,
     paddingHorizontal: 14,
     marginBottom: 20,
   },
-
-  passwordInput: { flex: 1, paddingVertical: 14, fontSize: 14 },
-
-  showText: { color: "#1D4ED8", fontWeight: "600", fontSize: 13 },
-
+  passwordInput: { flex: 1, paddingVertical: 14 },
+  showText: { color: "#1D4ED8", fontWeight: "600" },
   button: {
     backgroundColor: "#0F172A",
     paddingVertical: 15,
     borderRadius: 14,
     alignItems: "center",
   },
-
-  buttonText: { color: "#FFFFFF", fontWeight: "600", fontSize: 15 },
-
-  forgot: {
-    marginTop: 16,
-    textAlign: "center",
-    color: "#1D4ED8",
-    fontSize: 13,
-  },
+  buttonText: { color: "#fff", fontWeight: "600" },
 });
