@@ -130,7 +130,7 @@ export default function OutstandingViaSales() {
               <Ionicons name="chevron-back" size={24} color="#fff" />
             </TouchableOpacity>
             <View style={styles.headerTextContainer}>
-              <Text style={styles.headerTitle}>Outstanding Sales</Text>
+              <Text style={styles.headerTitle}>Customer Outstanding</Text>
               <Text style={styles.headerSubtitle}>{list.length} records found</Text>
             </View>
           </View>

@@ -103,17 +103,22 @@ const SeaTariffPage = () => {
         <ImageBackground source={BG_IMAGE} style={styles.flex1}>
             <SafeAreaView style={styles.flex1}>
                 <View style={styles.container}>
-                    {/* HEADER */}
+                    {/* CENTERED HEADER */}
                     <View style={headerStyles.headerBar}>
-
                         <Pressable onPress={() => router.back()} style={headerStyles.iconBtn}>
                             <Ionicons name="arrow-back" size={22} color="#fff" />
                         </Pressable>
 
-                        <Text style={headerStyles.headerTitle}>Sea Tariffs</Text>
+                        <View style={headerStyles.titleContainer}>
+                            <Text style={headerStyles.headerTitle}>Sea Tariffs</Text>
+                        </View>
+
                         {(selectedPol || selectedPod) && (
-                            <TouchableOpacity onPress={() => { setSelectedPol(null); setSelectedPod(null); }}>
-                                <Text style={{ color: '#003366', fontWeight: 'bold' }}>Clear</Text>
+                            <TouchableOpacity 
+                                style={headerStyles.clearBtn} 
+                                onPress={() => { setSelectedPol(null); setSelectedPod(null); }}
+                            >
+                                <Text style={headerStyles.clearText}>Clear</Text>
                             </TouchableOpacity>
                         )}
                     </View>
@@ -170,12 +175,11 @@ const SeaTariffPage = () => {
 const SearchModal = ({ visible, data, title, onSelect, onClose }: any) => {
     const [search, setSearch] = useState("");
 
-const filtered = data.filter((i: any) => {
-    const itemText = (i?.text ?? "").toString().trim().toLowerCase();
-    const searchText = (search ?? "").toString().trim().toLowerCase();
-    return itemText.includes(searchText);
-});
-
+    const filtered = data.filter((i: any) => {
+        const itemText = (i?.text ?? "").toString().trim().toLowerCase();
+        const searchText = (search ?? "").toString().trim().toLowerCase();
+        return itemText.includes(searchText);
+    });
 
     return (
         <Modal visible={visible} animationType="slide" transparent={false}>
@@ -183,7 +187,9 @@ const filtered = data.filter((i: any) => {
                 <SafeAreaView style={styles.flex1}>
                     <View style={styles.modalContent}>
                         <View style={headerStyles.headerBar}>
-                            <Text style={headerStyles.headerTitle}>{title}</Text>
+                            <View style={headerStyles.titleContainer}>
+                                <Text style={headerStyles.headerTitle}>{title}</Text>
+                            </View>
                         </View>
 
                         <TextInput
@@ -207,7 +213,6 @@ const filtered = data.filter((i: any) => {
                             )}
                         />
 
-
                         <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
                             <Text style={{ color: "#fff", fontWeight: 'bold' }}>Close</Text>
                         </TouchableOpacity>
@@ -226,8 +231,6 @@ const Row = ({ label, value }: any) => (
     </View>
 );
 
-export default SeaTariffPage;
-
 /* ================= STYLES ================= */
 const styles = StyleSheet.create({
     flex1: { flex: 1 },
@@ -241,7 +244,6 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: "#e0e0e0",
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.1,
         shadowRadius: 2,
         elevation: 2,
@@ -297,19 +299,44 @@ const headerStyles = StyleSheet.create({
     headerBar: {
         flexDirection: "row",
         alignItems: "center",
-        justifyContent: "space-between",
+        justifyContent: "center", // Horizontal center for children
         backgroundColor: "rgba(244, 244, 250, 0.9)",
         borderRadius: 15,
-        padding: 16,
+        height: 60, // Fixed height helps centering
+        paddingHorizontal: 16,
         marginBottom: 15,
     },
-    headerTitle: { fontSize: 20, fontWeight: "800", color: "#051539" },
+    titleContainer: {
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    headerTitle: { 
+        fontSize: 18, 
+        fontWeight: "800", 
+        color: "#051539",
+        textAlign: 'center' 
+    },
     iconBtn: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        position: "absolute",
+        left: 12,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         backgroundColor: "#051539",
         justifyContent: "center",
         alignItems: "center",
+        zIndex: 10,
     },
+    clearBtn: {
+        position: "absolute",
+        right: 16,
+        zIndex: 10,
+    },
+    clearText: { 
+        color: '#003366', 
+        fontWeight: 'bold',
+        fontSize: 14 
+    }
 });
+
+export default SeaTariffPage;
