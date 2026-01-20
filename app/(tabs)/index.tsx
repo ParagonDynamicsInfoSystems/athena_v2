@@ -92,7 +92,7 @@ export default function DashboardScreen() {
 
                 {/* LOGOUT */}
                 <TouchableOpacity
-                  onPress={() => router.replace("/(auth)/login")}
+                  onPress={() => router.replace("./(auth)/login")}
                   style={styles.logoutBtn}
                 >
                   <Ionicons name="log-out-outline" size={20} color="#EF4444" />

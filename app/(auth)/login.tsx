@@ -157,7 +157,7 @@ export default function LoginScreen() {
         // 🔔 Register token with logged-in user
         await registerNotificationToken(user.userId);
 
-        router.replace("/(tabs)");
+        router.replace("/post-login");
       } else {
         Alert.alert(
           "Login Failed",
