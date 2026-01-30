@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "772022419612",
+    "project_id": "athenalogistics",
+    "storage_bucket": "athenalogistics.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:772022419612:android:e708957819af0aff24ed59",
+        "android_client_info": {
+          "package_name": "com.paragondynamics.athenalogistics"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBypu9voMZvthNEkKpzZ3Wuo0uxCWurnFs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

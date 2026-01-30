@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
@@ -62,7 +63,9 @@ export default function AddMeetingScreen() {
   const params = useLocalSearchParams();
 
   /* ================= PARAMS FROM CALENDAR ================= */
-  const prePlanId = typeof params.pre_plan_id === "string" ? params.pre_plan_id : "";
+  const prePlanId = typeof params.pre_plan_id === "string" && params.pre_plan_id.trim() !== "" 
+    ? params.pre_plan_id 
+    : "";
   const customerId = typeof params.customer_id === "string" ? params.customer_id : "";
   const customerName = typeof params.customer === "string" ? params.customer : "";
 
@@ -87,7 +90,7 @@ export default function AddMeetingScreen() {
   const [nextCallDate, setNextCallDate] = useState<Date | null>(null);
 
   const [activity, setActivity] = useState("");
-  const [cntryId, setCntryId] = useState(""); // This holds the City/Location Name
+  const [cntryId, setCntryId] = useState(""); // Location Name
   const [mode, setMode] = useState<number | null>(null);
 
   const [showServiceDropdown, setShowServiceDropdown] = useState(false);
@@ -120,22 +123,28 @@ export default function AddMeetingScreen() {
   /* ================= LOAD CUSTOMERS ================= */
   useEffect(() => {
     (async () => {
-      const userId = await AsyncStorage.getItem("crmUserId");
-      if (!userId) return;
+      try {
+        const userId = await AsyncStorage.getItem("crmUserId");
+        if (!userId) return;
 
-      const res = await aiApi.get("/crm_data/customers", {
-        params: { user_id: userId.toUpperCase() },
-      });
+        const res = await aiApi.get("/crm_data/customers", {
+          params: { user_id: userId.toUpperCase() },
+        });
 
-      const list =
-        res.data?.customers_interacted?.map((c: any) => ({
-          id: c.customer_id,
-          name: c.cust_name,
-          email: c.email_id,
-        })) || [];
+        const list =
+          res.data?.customers_interacted
+            ?.filter((c: any) => c.customer_id && c.cust_name) // Filter out null entries
+            ?.map((c: any) => ({
+              id: String(c.customer_id || ""),
+              name: String(c.cust_name || ""),
+              email: c.email_id || "",
+            })) || [];
 
-      setCustomers(list);
-      setFilteredCustomers(list);
+        setCustomers(list);
+        setFilteredCustomers(list);
+      } catch (error) {
+        console.error("Failed to load customers:", error);
+      }
     })();
   }, []);
 
@@ -148,19 +157,20 @@ export default function AddMeetingScreen() {
           meetingData = JSON.parse(params.meeting);
         }
       } catch (err) {
-        console.log("Failed to parse meeting data");
+        console.error("Failed to parse meeting data:", err);
       }
 
       if (meetingData) {
-        if (meetingData.customer) setCustomerText(meetingData.customer);
-        if (meetingData.customer_id) setSelectedCustomerId(meetingData.customer_id);
-        if (meetingData.remarks) setRemarks(meetingData.remarks);
+        if (meetingData.customer) setCustomerText(String(meetingData.customer));
+        if (meetingData.customer_id) setSelectedCustomerId(String(meetingData.customer_id));
+        if (meetingData.remarks) setRemarks(String(meetingData.remarks));
+        if (meetingData.activity) setActivity(String(meetingData.activity));
       } else if (customerId && customerName) {
         setCustomerText(customerName);
         setSelectedCustomerId(customerId);
       }
     }
-  }, [params.meeting, customerId, customerName]);
+  }, [params.meeting, customerId, customerName, customerText]);
 
   /* ================= AUTO LOCATION & PATCH CITY ================= */
   useEffect(() => {
@@ -168,7 +178,11 @@ export default function AddMeetingScreen() {
       try {
         setLocationLoading(true);
         const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== "granted") return;
+        if (status !== "granted") {
+          setLocationLoading(false);
+          Alert.alert("Permission Denied", "Location permission is required for this feature");
+          return;
+        }
 
         const loc = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.High,
@@ -187,13 +201,16 @@ export default function AddMeetingScreen() {
             .join(", ");
           setAddress(addr);
           
-          // Automatically patch City/Location name into cntryId state
+          // Automatically patch City/Location name
           if (g.city) {
             setCntryId(g.city);
           } else if (g.region) {
             setCntryId(g.region);
           }
         }
+      } catch (error) {
+        console.error("Location error:", error);
+        Alert.alert("Location Error", "Failed to get current location");
       } finally {
         setLocationLoading(false);
       }
@@ -206,13 +223,14 @@ export default function AddMeetingScreen() {
     setSelectedCustomerId(null);
 
     if (text.trim().length > 0) {
+      const searchText = text.toLowerCase();
       const filtered = customers.filter(
         c =>
-          c.name.toLowerCase().includes(text.toLowerCase()) ||
-          c.id.toString().toLowerCase().includes(text.toLowerCase())
+          (c.name && c.name.toLowerCase().includes(searchText)) ||
+          (c.id && c.id.toString().toLowerCase().includes(searchText))
       );
       setFilteredCustomers(filtered);
-      setShowCustomerDropdown(true);
+      setShowCustomerDropdown(filtered.length > 0);
     } else {
       setShowCustomerDropdown(false);
     }
@@ -227,10 +245,21 @@ export default function AddMeetingScreen() {
 
   /* ================= VALIDATION ================= */
   const validate = () => {
-    if (!selectedCustomerId && (!customerText || !customerEmail)) {
+    // Customer validation
+    if (!selectedCustomerId && (!customerText.trim() || !customerEmail.trim())) {
       Alert.alert("Validation Error", "Please select a customer or enter name & email");
       return false;
     }
+    
+    // Email validation if provided
+    if (!selectedCustomerId && customerEmail.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(customerEmail)) {
+        Alert.alert("Validation Error", "Please enter a valid email address");
+        return false;
+      }
+    }
+    
     if (!serviceType) {
       Alert.alert("Validation Error", "Please select a service type");
       return false;
@@ -252,6 +281,7 @@ export default function AddMeetingScreen() {
       return false;
     }
 
+    // Fields required only when NOT converting from pre-plan
     if (!prePlanId) {
       if (!activity.trim()) {
         Alert.alert("Validation Error", "Please enter activity");
@@ -277,7 +307,10 @@ export default function AddMeetingScreen() {
     try {
       setLoading(true);
       const userId = await AsyncStorage.getItem("crmUserId");
-      if (!userId) throw new Error("User ID missing");
+      if (!userId) {
+        Alert.alert("Error", "User session expired");
+        return;
+      }
 
       const payload: any = {
         remarks,
@@ -293,19 +326,23 @@ export default function AddMeetingScreen() {
       if (nextCallDate) payload.next_call_date = formatDDMMYYYY(nextCallDate);
 
       if (prePlanId) {
+        // Converting from pre-plan
         payload.pre_plan_id = prePlanId;
       } else {
+        // Fresh meeting entry
         payload.activity = activity;
-        payload.cntry_id = cntryId; // Sending the location name
+        payload.cntry_id = cntryId;
         payload.mode = mode;
 
         if (selectedCustomerId) {
           payload.customer_id = parseInt(selectedCustomerId);
         } else {
-          payload.customer_name = customerText;
-          payload.customer_email = customerEmail;
+          payload.customer_name = customerText.trim();
+          payload.customer_email = customerEmail.trim();
         }
       }
+
+      console.log("Posting meeting with payload:", payload);
 
       await aiApi.post("/calendar/post-meeting", payload, {
         params: { user_id: userId.toUpperCase() },
@@ -314,6 +351,7 @@ export default function AddMeetingScreen() {
       Alert.alert("✅ Success", "Meeting posted successfully");
       router.replace("/(tabs)/calendar");
     } catch (e: any) {
+      console.error("Post meeting error:", e);
       Alert.alert("Error", e?.response?.data?.message || e?.message || "Failed to post meeting");
     } finally {
       setLoading(false);
@@ -323,152 +361,352 @@ export default function AddMeetingScreen() {
   return (
     <ImageBackground source={BG_IMAGE} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
-          <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-            <View style={styles.card}>
-              <Text style={styles.title}>{prePlanId ? "Convert to Meeting" : "Add Meeting"}</Text>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === "ios" ? "padding" : "height"} 
+          style={{ flex: 1 }}
+        >
+          <ScrollView 
+            contentContainerStyle={styles.scroll} 
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Header */}
+            <View style={styles.header}>
+              <Pressable onPress={() => router.back()} style={styles.backBtn}>
+                <Ionicons name="chevron-back" size={24} color="#051539" />
+              </Pressable>
+              <Text style={styles.headerTitle}>
+                {prePlanId ? "Convert to Meeting" : "Add Meeting"}
+              </Text>
+              <View style={{ width: 40 }} />
+            </View>
 
+            <View style={styles.card}>
               {/* CUSTOMER */}
               <View style={{ zIndex: 10 }}>
-                <Text style={styles.label}>Customer *</Text>
-                <TextInput
-                  style={[styles.input, prePlanId && selectedCustomerId && styles.inputDisabled]}
-                  value={customerText}
-                  placeholder="Search or enter customer name"
-                  onChangeText={handleCustomerChange}
-                  onFocus={() => !prePlanId && customerText.length > 0 && setShowCustomerDropdown(true)}
-                  editable={!(prePlanId && selectedCustomerId)}
-                />
+                <Text style={styles.label}>
+                  Customer <Text style={styles.required}>*</Text>
+                </Text>
+                <View style={styles.inputContainer}>
+                  <Ionicons name="person-outline" size={20} color="#64748B" style={styles.inputIcon} />
+                  <TextInput
+                    style={[
+                      styles.input, 
+                      styles.inputWithIcon,
+                      prePlanId && selectedCustomerId && styles.inputDisabled
+                    ]}
+                    value={customerText}
+                    placeholder="Search or enter customer name"
+                    placeholderTextColor="#94A3B8"
+                    onChangeText={handleCustomerChange}
+                    onFocus={() => !prePlanId && customerText.length > 0 && setShowCustomerDropdown(true)}
+                    editable={!(prePlanId && selectedCustomerId)}
+                  />
+                  {selectedCustomerId && (
+                    <Ionicons name="checkmark-circle" size={20} color="#10B981" style={styles.checkIcon} />
+                  )}
+                </View>
 
-                {showCustomerDropdown && !prePlanId && (
+                {showCustomerDropdown && !prePlanId && filteredCustomers.length > 0 && (
                   <View style={styles.dropdownContainer}>
-                    {filteredCustomers.map(c => (
-                      <Pressable key={c.id} style={styles.dropdownItem} onPress={() => handleSelectCustomer(c)}>
-                        <Text style={styles.customerName}>{c.name}</Text>
-                        <Text style={styles.customerId}>ID: {c.id}</Text>
-                      </Pressable>
-                    ))}
+                    <ScrollView style={styles.dropdownScroll} nestedScrollEnabled>
+                      {filteredCustomers.slice(0, 5).map(c => (
+                        <Pressable 
+                          key={c.id} 
+                          style={styles.dropdownItem} 
+                          onPress={() => handleSelectCustomer(c)}
+                        >
+                          <Text style={styles.customerName}>{c.name}</Text>
+                          <Text style={styles.customerId}>ID: {c.id}</Text>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
                   </View>
                 )}
               </View>
 
               {!selectedCustomerId && !prePlanId && (
                 <>
-                  <Text style={styles.label}>Customer Email *</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={customerEmail}
-                    onChangeText={setCustomerEmail}
-                    keyboardType="email-address"
-                    placeholder="Enter customer email"
-                  />
+                  <Text style={styles.label}>
+                    Customer Email <Text style={styles.required}>*</Text>
+                  </Text>
+                  <View style={styles.inputContainer}>
+                    <Ionicons name="mail-outline" size={20} color="#64748B" style={styles.inputIcon} />
+                    <TextInput
+                      style={[styles.input, styles.inputWithIcon]}
+                      value={customerEmail}
+                      onChangeText={setCustomerEmail}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      placeholder="Enter customer email"
+                      placeholderTextColor="#94A3B8"
+                    />
+                  </View>
                 </>
               )}
 
-              {selectedCustomerId && <Text style={styles.infoText}>Customer ID: {selectedCustomerId}</Text>}
-              {prePlanId && <Text style={styles.infoText}>Pre-Plan ID: {prePlanId}</Text>}
+              {selectedCustomerId && (
+                <View style={styles.infoBox}>
+                  <Ionicons name="information-circle" size={16} color="#1E4DB3" />
+                  <Text style={styles.infoText}>Customer ID: {selectedCustomerId}</Text>
+                </View>
+              )}
+              
+              {prePlanId && (
+                <View style={styles.infoBox}>
+                  <Ionicons name="calendar" size={16} color="#1E4DB3" />
+                  <Text style={styles.infoText}>Converting Pre-Plan: {prePlanId}</Text>
+                </View>
+              )}
 
               {/* CONDITIONALLY MANDATORY FIELDS */}
               {!prePlanId && (
                 <>
-                  <Text style={styles.label}>Activity *</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={activity}
-                    onChangeText={setActivity}
-                    placeholder="Enter activity description"
-                  />
+                  <Text style={styles.label}>
+                    Activity <Text style={styles.required}>*</Text>
+                  </Text>
+                  <View style={styles.inputContainer}>
+                    <Ionicons name="clipboard-outline" size={20} color="#64748B" style={styles.inputIcon} />
+                    <TextInput
+                      style={[styles.input, styles.inputWithIcon]}
+                      value={activity}
+                      onChangeText={setActivity}
+                      placeholder="Enter activity description"
+                      placeholderTextColor="#94A3B8"
+                    />
+                  </View>
 
-                  <Text style={styles.label}>Location *</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={cntryId}
-                    onChangeText={setCntryId}
-                    placeholder="Fetching location..."
-                  />
+                  <Text style={styles.label}>
+                    Location <Text style={styles.required}>*</Text>
+                  </Text>
+                  <View style={styles.inputContainer}>
+                    <Ionicons name="location-outline" size={20} color="#64748B" style={styles.inputIcon} />
+                    <TextInput
+                      style={[styles.input, styles.inputWithIcon]}
+                      value={cntryId}
+                      onChangeText={setCntryId}
+                      placeholder={locationLoading ? "Fetching location..." : "Enter location"}
+                      placeholderTextColor="#94A3B8"
+                    />
+                  </View>
 
-                  <Text style={styles.label}>Mode *</Text>
-                  <Pressable style={styles.input} onPress={() => setShowModeDropdown(!showModeDropdown)}>
-                    <Text style={mode === null && { color: '#999' }}>
-                      {PLAN_MODES.find(m => m.value === mode)?.label || "Select mode"}
-                    </Text>
+                  <Text style={styles.label}>
+                    Mode <Text style={styles.required}>*</Text>
+                  </Text>
+                  <Pressable 
+                    style={styles.inputContainer} 
+                    onPress={() => setShowModeDropdown(!showModeDropdown)}
+                  >
+                    <Ionicons name="options-outline" size={20} color="#64748B" style={styles.inputIcon} />
+                    <View style={[styles.input, styles.inputWithIcon]}>
+                      <Text style={[styles.inputText, mode === null && styles.placeholderText]}>
+                        {PLAN_MODES.find(m => m.value === mode)?.label || "Select mode"}
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-down" size={20} color="#64748B" style={styles.chevronIcon} />
                   </Pressable>
-                  {showModeDropdown && PLAN_MODES.map(m => (
-                    <Pressable key={m.value} style={styles.dropdownItem} onPress={() => { setMode(m.value); setShowModeDropdown(false); }}>
-                      <Text>{m.label}</Text>
-                    </Pressable>
-                  ))}
+                  
+                  {showModeDropdown && (
+                    <View style={styles.dropdownContainer}>
+                      {PLAN_MODES.map(m => (
+                        <Pressable 
+                          key={m.value} 
+                          style={[styles.dropdownItem, mode === m.value && styles.dropdownItemSelected]} 
+                          onPress={() => { setMode(m.value); setShowModeDropdown(false); }}
+                        >
+                          <Text style={[styles.dropdownText, mode === m.value && styles.dropdownTextSelected]}>
+                            {m.label}
+                          </Text>
+                          {mode === m.value && (
+                            <Ionicons name="checkmark" size={20} color="#1E4DB3" />
+                          )}
+                        </Pressable>
+                      ))}
+                    </View>
+                  )}
                 </>
               )}
 
               {/* LOCATION PREVIEW */}
               <Text style={styles.label}>Address Details</Text>
               <View style={styles.readOnlyBox}>
-                {locationLoading ? <ActivityIndicator color="#0D47A1" /> : (
+                {locationLoading ? (
+                  <View style={styles.locationLoadingContainer}>
+                    <ActivityIndicator color="#1E4DB3" />
+                    <Text style={styles.loadingText}>Fetching location...</Text>
+                  </View>
+                ) : (
                   <>
-                    <Text style={styles.readOnlyText}>{address || "N/A"}</Text>
-                    <Text style={styles.coords}>Lat: {latitude?.toFixed(6)} | Lng: {longitude?.toFixed(6)}</Text>
+                    <View style={styles.addressRow}>
+                      <Ionicons name="location" size={16} color="#64748B" />
+                      <Text style={styles.readOnlyText}>{address || "Location not available"}</Text>
+                    </View>
+                    {latitude && longitude && (
+                      <Text style={styles.coords}>
+                        Lat: {latitude.toFixed(6)} | Lng: {longitude.toFixed(6)}
+                      </Text>
+                    )}
                   </>
                 )}
               </View>
 
               {/* SERVICE TYPE */}
-              <Text style={styles.label}>Service Type *</Text>
-              <Pressable style={styles.input} onPress={() => setShowServiceDropdown(!showServiceDropdown)}>
-                <Text style={!serviceType && { color: '#999' }}>
-                  {SERVICE_TYPES.find(s => s.value === serviceType)?.label || "Select service type"}
-                </Text>
+              <Text style={styles.label}>
+                Service Type <Text style={styles.required}>*</Text>
+              </Text>
+              <Pressable 
+                style={styles.inputContainer} 
+                onPress={() => setShowServiceDropdown(!showServiceDropdown)}
+              >
+                <Ionicons name="briefcase-outline" size={20} color="#64748B" style={styles.inputIcon} />
+                <View style={[styles.input, styles.inputWithIcon]}>
+                  <Text style={[styles.inputText, !serviceType && styles.placeholderText]}>
+                    {SERVICE_TYPES.find(s => s.value === serviceType)?.label || "Select service type"}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-down" size={20} color="#64748B" style={styles.chevronIcon} />
               </Pressable>
-              {showServiceDropdown && SERVICE_TYPES.map(s => (
-                <Pressable key={s.value} style={styles.dropdownItem} onPress={() => { setServiceType(s.value as any); setShowServiceDropdown(false); }}>
-                  <Text>{s.label}</Text>
-                </Pressable>
-              ))}
+              
+              {showServiceDropdown && (
+                <View style={styles.dropdownContainer}>
+                  {SERVICE_TYPES.map(s => (
+                    <Pressable 
+                      key={s.value} 
+                      style={[styles.dropdownItem, serviceType === s.value && styles.dropdownItemSelected]} 
+                      onPress={() => { setServiceType(s.value as any); setShowServiceDropdown(false); }}
+                    >
+                      <Text style={[styles.dropdownText, serviceType === s.value && styles.dropdownTextSelected]}>
+                        {s.label}
+                      </Text>
+                      {serviceType === s.value && (
+                        <Ionicons name="checkmark" size={20} color="#1E4DB3" />
+                      )}
+                    </Pressable>
+                  ))}
+                </View>
+              )}
 
               {/* TRANSPORT MODE */}
-              <Text style={styles.label}>Transportation Mode *</Text>
-              <Pressable style={styles.input} onPress={() => setShowTransportDropdown(!showTransportDropdown)}>
-                <Text style={!transportMode && { color: '#999' }}>
-                  {TRANSPORT_MODES.find(t => t.value === transportMode)?.label || "Select transportation mode"}
-                </Text>
+              <Text style={styles.label}>
+                Transportation Mode <Text style={styles.required}>*</Text>
+              </Text>
+              <Pressable 
+                style={styles.inputContainer} 
+                onPress={() => setShowTransportDropdown(!showTransportDropdown)}
+              >
+                <Ionicons name="airplane-outline" size={20} color="#64748B" style={styles.inputIcon} />
+                <View style={[styles.input, styles.inputWithIcon]}>
+                  <Text style={[styles.inputText, !transportMode && styles.placeholderText]}>
+                    {TRANSPORT_MODES.find(t => t.value === transportMode)?.label || "Select transportation mode"}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-down" size={20} color="#64748B" style={styles.chevronIcon} />
               </Pressable>
-              {showTransportDropdown && TRANSPORT_MODES.map(t => (
-                <Pressable key={t.value} style={styles.dropdownItem} onPress={() => { setTransportMode(t.value as any); setShowTransportDropdown(false); }}>
-                  <Text>{t.label}</Text>
-                </Pressable>
-              ))}
+              
+              {showTransportDropdown && (
+                <View style={styles.dropdownContainer}>
+                  {TRANSPORT_MODES.map(t => (
+                    <Pressable 
+                      key={t.value} 
+                      style={[styles.dropdownItem, transportMode === t.value && styles.dropdownItemSelected]} 
+                      onPress={() => { setTransportMode(t.value as any); setShowTransportDropdown(false); }}
+                    >
+                      <Text style={[styles.dropdownText, transportMode === t.value && styles.dropdownTextSelected]}>
+                        {t.label}
+                      </Text>
+                      {transportMode === t.value && (
+                        <Ionicons name="checkmark" size={20} color="#1E4DB3" />
+                      )}
+                    </Pressable>
+                  ))}
+                </View>
+              )}
 
-              <Text style={styles.label}>Contact Person *</Text>
-              <TextInput 
-                style={styles.input} 
-                value={contactPerson} 
-                onChangeText={setContactPerson} 
-                placeholder="Enter contact person name" 
-              />
+              {/* CONTACT PERSON */}
+              <Text style={styles.label}>
+                Contact Person <Text style={styles.required}>*</Text>
+              </Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="person-circle-outline" size={20} color="#64748B" style={styles.inputIcon} />
+                <TextInput 
+                  style={[styles.input, styles.inputWithIcon]} 
+                  value={contactPerson} 
+                  onChangeText={setContactPerson} 
+                  placeholder="Enter contact person name"
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
 
-              <Text style={styles.label}>Division *</Text>
-              <Pressable style={styles.input} onPress={() => setShowDivisionDropdown(!showDivisionDropdown)}>
-                <Text style={!division && { color: '#999' }}>
-                  {DIVISIONS.find(d => d.value === division)?.label || "Select division"}
-                </Text>
+              {/* DIVISION */}
+              <Text style={styles.label}>
+                Division <Text style={styles.required}>*</Text>
+              </Text>
+              <Pressable 
+                style={styles.inputContainer} 
+                onPress={() => setShowDivisionDropdown(!showDivisionDropdown)}
+              >
+                <Ionicons name="business-outline" size={20} color="#64748B" style={styles.inputIcon} />
+                <View style={[styles.input, styles.inputWithIcon]}>
+                  <Text style={[styles.inputText, !division && styles.placeholderText]}>
+                    {DIVISIONS.find(d => d.value === division)?.label || "Select division"}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-down" size={20} color="#64748B" style={styles.chevronIcon} />
               </Pressable>
-              {showDivisionDropdown && DIVISIONS.map(d => (
-                <Pressable key={d.value} style={styles.dropdownItem} onPress={() => { setDivision(d.value); setShowDivisionDropdown(false); }}>
-                  <Text>{d.label}</Text>
-                </Pressable>
-              ))}
+              
+              {showDivisionDropdown && (
+                <View style={styles.dropdownContainer}>
+                  <ScrollView style={styles.dropdownScroll} nestedScrollEnabled>
+                    {DIVISIONS.map(d => (
+                      <Pressable 
+                        key={d.value} 
+                        style={[styles.dropdownItem, division === d.value && styles.dropdownItemSelected]} 
+                        onPress={() => { setDivision(d.value); setShowDivisionDropdown(false); }}
+                      >
+                        <Text style={[styles.dropdownText, division === d.value && styles.dropdownTextSelected]}>
+                          {d.label}
+                        </Text>
+                        {division === d.value && (
+                          <Ionicons name="checkmark" size={20} color="#1E4DB3" />
+                        )}
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
 
-              <Text style={styles.label}>Remarks *</Text>
-              <TextInput 
-                style={[styles.input, { height: 80 }]} 
-                multiline 
-                value={remarks} 
-                onChangeText={setRemarks} 
-                placeholder="Enter meeting remarks or notes" 
-              />
+              {/* REMARKS */}
+              <Text style={styles.label}>
+                Remarks <Text style={styles.required}>*</Text>
+              </Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="document-text-outline" size={20} color="#64748B" style={[styles.inputIcon, { top: 16 }]} />
+                <TextInput 
+                  style={[styles.input, styles.inputWithIcon, styles.textArea]} 
+                  multiline 
+                  numberOfLines={4}
+                  value={remarks} 
+                  onChangeText={setRemarks} 
+                  placeholder="Enter meeting remarks or notes"
+                  placeholderTextColor="#94A3B8"
+                  textAlignVertical="top"
+                />
+              </View>
 
-              <Pressable style={[styles.saveBtn, loading && { opacity: 0.6 }]} onPress={handleSave} disabled={loading}>
-                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveText}>Post Meeting</Text>}
+              {/* SAVE BUTTON */}
+              <Pressable 
+                style={[styles.saveBtn, loading && styles.saveBtnDisabled]} 
+                onPress={handleSave} 
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle-outline" size={22} color="#fff" />
+                    <Text style={styles.saveText}>Post Meeting</Text>
+                  </>
+                )}
               </Pressable>
             </View>
           </ScrollView>
@@ -479,20 +717,207 @@ export default function AddMeetingScreen() {
 }
 
 const styles = StyleSheet.create({
-  scroll: { padding: 20 },
-  card: { backgroundColor: "#fff", borderRadius: 18, padding: 20 },
-  title: { fontSize: 22, fontWeight: "800", textAlign: "center", marginBottom: 20, color: "#051539" },
-  label: { marginTop: 14, marginBottom: 6, color: "#555", fontWeight: "600" },
-  input: { backgroundColor: "#f2f6ff", borderRadius: 10, padding: 12, borderWidth: 1, borderColor: "#cfdafb" },
-  inputDisabled: { backgroundColor: "#f0f0f0", borderColor: "#ddd" },
-  dropdownContainer: { backgroundColor: "#fff", borderRadius: 8, marginTop: 4, borderWidth: 1, borderColor: "#cfdafb", overflow: 'hidden', maxHeight: 200 },
-  dropdownItem: { padding: 12, backgroundColor: "#eef3ff", borderBottomWidth: 1, borderBottomColor: "#cfdafb" },
-  customerName: { fontWeight: "700", color: "#051539" },
-  customerId: { fontSize: 12, color: "#666", marginTop: 2 },
-  infoText: { fontSize: 12, color: "#0D47A1", marginTop: 4, fontWeight: "600", backgroundColor: "#E3F2FD", padding: 8, borderRadius: 6 },
-  readOnlyBox: { backgroundColor: "#f5f7fb", borderRadius: 10, padding: 12, borderWidth: 1, borderColor: "#d0d7f5" },
-  readOnlyText: { fontSize: 13, color: "#333" },
-  coords: { fontSize: 11, color: "#666", marginTop: 4 },
-  saveBtn: { marginTop: 24, backgroundColor: "#0D47A1", paddingVertical: 14, borderRadius: 28, alignItems: "center" },
-  saveText: { color: "#fff", fontWeight: "800", fontSize: 16 },
+  scroll: { padding: 16, paddingBottom: 40 },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 12,
+    elevation: 2,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "#F1F5F9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#051539",
+  },
+  card: { 
+    backgroundColor: "#fff", 
+    borderRadius: 24, 
+    padding: 20,
+    elevation: 3,
+  },
+  label: { 
+    marginTop: 16, 
+    marginBottom: 8, 
+    color: "#1E293B", 
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  required: {
+    color: "#EF4444",
+    fontWeight: "900",
+  },
+  inputContainer: {
+    position: "relative",
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  input: { 
+    backgroundColor: "#F8FAFC", 
+    borderRadius: 14, 
+    padding: 12, 
+    borderWidth: 1.5, 
+    borderColor: "#E2E8F0",
+    flex: 1,
+    justifyContent: "center",
+    minHeight: 50,
+  },
+  inputWithIcon: {
+    paddingLeft: 44,
+  },
+  inputIcon: {
+    position: "absolute",
+    left: 14,
+    zIndex: 1,
+  },
+  checkIcon: {
+    position: "absolute",
+    right: 14,
+  },
+  chevronIcon: {
+    position: "absolute",
+    right: 14,
+  },
+  inputText: {
+    color: "#1E293B",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  placeholderText: {
+    color: "#94A3B8",
+    fontWeight: "400",
+  },
+  inputDisabled: { 
+    backgroundColor: "#F1F5F9", 
+    borderColor: "#E2E8F0",
+    opacity: 0.7,
+  },
+  textArea: {
+    height: 100,
+    paddingTop: 14,
+  },
+  dropdownContainer: { 
+    backgroundColor: "#F8FAFC", 
+    borderRadius: 14, 
+    marginTop: 8, 
+    borderWidth: 1.5, 
+    borderColor: "#E2E8F0", 
+    maxHeight: 200,
+    overflow: "hidden",
+  },
+  dropdownScroll: {
+    maxHeight: 200,
+  },
+  dropdownItem: { 
+    padding: 14, 
+    borderBottomWidth: 1, 
+    borderBottomColor: "#E2E8F0",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  dropdownItemSelected: {
+    backgroundColor: "#EFF6FF",
+  },
+  dropdownText: {
+    fontSize: 15,
+    color: "#1E293B",
+    fontWeight: "600",
+  },
+  dropdownTextSelected: {
+    color: "#1E4DB3",
+    fontWeight: "700",
+  },
+  customerName: { 
+    fontWeight: "700", 
+    color: "#1E293B",
+    fontSize: 15,
+  },
+  customerId: { 
+    fontSize: 12, 
+    color: "#64748B", 
+    marginTop: 2,
+  },
+  infoBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#EFF6FF",
+    padding: 10,
+    borderRadius: 12,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: "#DBEAFE",
+  },
+  infoText: { 
+    fontSize: 13, 
+    color: "#1E4DB3", 
+    fontWeight: "600",
+    flex: 1,
+  },
+  readOnlyBox: { 
+    backgroundColor: "#F8FAFC", 
+    borderRadius: 14, 
+    padding: 14, 
+    borderWidth: 1.5, 
+    borderColor: "#E2E8F0",
+    minHeight: 60,
+  },
+  locationLoadingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  loadingText: {
+    color: "#64748B",
+    fontSize: 14,
+  },
+  addressRow: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "flex-start",
+  },
+  readOnlyText: { 
+    fontSize: 13, 
+    color: "#1E293B",
+    flex: 1,
+    lineHeight: 18,
+  },
+  coords: { 
+    fontSize: 11, 
+    color: "#64748B", 
+    marginTop: 8,
+    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
+  },
+  saveBtn: { 
+    marginTop: 28, 
+    backgroundColor: "#1E4DB3", 
+    paddingVertical: 16, 
+    borderRadius: 16, 
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 8,
+    elevation: 4,
+  },
+  saveBtnDisabled: {
+    opacity: 0.5,
+    elevation: 0,
+  },
+  saveText: { 
+    color: "#fff", 
+    fontWeight: "800", 
+    fontSize: 16,
+  },
 });
