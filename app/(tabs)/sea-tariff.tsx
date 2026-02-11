@@ -55,8 +55,18 @@ const SeaTariffPage = () => {
             try {
                 setLoading(true);
                 const res = await erpApi.get("/Athena/standardcharge/aodList");
-                setPolList(res.data?.lCommonUtilityBean || []);
-                setPodList(res.data?.commonUtilityBean || []);
+                console.log("POL DATA:", res.data?.lCommonUtilityBean);
+console.log("POD DATA:", res.data?.commonUtilityBean);
+
+                const mapPorts = (arr: any[]) =>
+  (arr || []).map(p => ({
+    code: p.code || p.portCode || p.value,
+    text: p.text || p.portName || p.label,
+  }));
+
+setPolList(mapPorts(res.data?.lCommonUtilityBean));
+setPodList(mapPorts(res.data?.commonUtilityBean));
+
             } catch (err) {
                 Alert.alert("Error", "Failed to load Port list");
             } finally {
@@ -84,8 +94,14 @@ const SeaTariffPage = () => {
 
     const filteredList = useMemo(() => {
         return list.filter(item => {
-            const polMatch = selectedPol ? item.pol === selectedPol.code : true;
-            const podMatch = selectedPod ? item.pod === selectedPod.code : true;
+            const polMatch = selectedPol
+  ? String(item.pol).toLowerCase() === String(selectedPol.code).toLowerCase()
+  : true;
+
+const podMatch = selectedPod
+  ? String(item.pod).toLowerCase() === String(selectedPod.code).toLowerCase()
+  : true;
+
             return polMatch && podMatch;
         });
     }, [list, selectedPol, selectedPod]);
@@ -175,11 +191,12 @@ const SeaTariffPage = () => {
 const SearchModal = ({ visible, data, title, onSelect, onClose }: any) => {
     const [search, setSearch] = useState("");
 
-    const filtered = data.filter((i: any) => {
-        const itemText = (i?.text ?? "").toString().trim().toLowerCase();
-        const searchText = (search ?? "").toString().trim().toLowerCase();
-        return itemText.includes(searchText);
-    });
+    const filtered = (data || []).filter((i: any) => {
+    const itemText = String(i?.text || "").toLowerCase();
+    const searchText = String(search || "").toLowerCase();
+    return itemText.includes(searchText);
+});
+
 
     return (
         <Modal visible={visible} animationType="slide" transparent={false}>

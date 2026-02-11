@@ -106,6 +106,10 @@ export default function CalendarScreen() {
     return today;
   });
   const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [transcriptMap, setTranscriptMap] = useState<
+  Record<string, { job_id: string; status: string }>
+>({});
+
   const [loading, setLoading] = useState(false);
 
   const scrollRef = useRef<ScrollView>(null);
@@ -145,11 +149,47 @@ export default function CalendarScreen() {
           user_id: userId,
         },
       });
+     const checkTranscript = async (prePlanId: string) => {
+  try {
+    const userId = await AsyncStorage.getItem("crmUserId");
+    if (!userId) return;
+
+    const resp = await aiApi.get("/meeting_transcription/status", {
+      params: {
+        user_id: userId,
+        pre_plan_id: prePlanId,
+      },
+    });
+
+    const data = resp?.data;
+
+    if (data?.job_id) {
+      setTranscriptMap((prev) => ({
+        ...prev,
+        [prePlanId]: {
+          job_id: data.job_id,
+          status: data.status,
+        },
+      }));
+    }
+  } catch (e) {
+    console.log("Transcript check failed:", e);
+  }
+};
 
       const calendar = resp.data?.calendar_meetings || {};
       const data = Array.isArray(calendar[key]) ? calendar[key] : [];
       
       setMeetings(data);
+      
+
+data.forEach((m: Meeting) => {
+  if (m.pre_plan_id) {
+    checkTranscript(m.pre_plan_id);
+  }
+});
+
+
     } catch (err) {
       console.error("Fetch meetings error:", err);
       setMeetings([]);
@@ -484,25 +524,45 @@ export default function CalendarScreen() {
                       )}
 
                       {m.callstatus?.toLowerCase() === "not met" && (
-                        <Pressable
-                          style={styles.convertBtn}
-                          onPress={() => router.push({
-                            pathname: "/(tabs)/meeting-entry",
-                            params: { 
-                              meetingDate: getKey(selectedDate), 
-                              postPlanId: m.post_plan_id!, 
-                              pre_plan_id: m.pre_plan_id ?? "", 
-                              customer_id: m.customer_id ?? "", 
-                              meeting: JSON.stringify(m) 
-                            },
-                          })}
-                          accessibilityLabel="Check in meeting"
-                          accessibilityRole="button"
-                        >
-                          <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
-                          <Text style={styles.convertText}>Check-in Meeting</Text>
-                        </Pressable>
-                      )}
+  <View style={styles.notMetActionRow}>
+    {/* Check-in button */}
+    <Pressable
+      style={styles.convertBtn}
+      onPress={() => router.push({
+        pathname: "/(tabs)/meeting-entry",
+        params: { 
+          meetingDate: getKey(selectedDate), 
+          postPlanId: m.post_plan_id!, 
+          pre_plan_id: m.pre_plan_id ?? "", 
+          customer_id: m.customer_id ?? "", 
+          meeting: JSON.stringify(m) 
+        },
+      })}
+      accessibilityLabel="Check in meeting"
+      accessibilityRole="button"
+    >
+      <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
+      <Text style={styles.convertText}>Check-in</Text>
+    </Pressable>
+
+    {/* Record button */}
+    <Pressable
+      style={styles.smallRecordBtn}
+      onPress={() => router.push({
+        pathname: "/meeting-recording",
+        params: { 
+          pre_plan_id: String(m.pre_plan_id ?? m.post_plan_id ?? "") 
+        },
+      })}
+      accessibilityLabel="Record meeting"
+      accessibilityRole="button"
+    >
+      <Ionicons name="mic-outline" size={18} color="#fff" />
+      <Text style={styles.smallRecordText}>Record</Text>
+    </Pressable>
+  </View>
+)}
+
 
                       {/* RECORDING BUTTON - Only show for "met" status */}
                       {m.callstatus?.toLowerCase() === "met" && (
@@ -518,7 +578,26 @@ export default function CalendarScreen() {
                           <Ionicons name="mic-outline" size={20} color="#fff" />
                           <Text style={styles.recordText}>Record Audio</Text>
                         </Pressable>
-                      )}
+                      )}{/* VIEW TRANSCRIPT BUTTON */}
+{m.pre_plan_id &&
+  transcriptMap[m.pre_plan_id]?.status === "completed" && (
+    <Pressable
+      style={[styles.smallRecordBtn, { backgroundColor: "#1E4DB3" }]}
+      onPress={() =>
+        router.push({
+          pathname: "/meeting-transcription-status",
+          params: {
+            job_id: transcriptMap[m.pre_plan_id].job_id,
+          },
+        })
+      }
+      accessibilityRole="button"
+    >
+      <Ionicons name="document-text-outline" size={18} color="#fff" />
+      <Text style={styles.smallRecordText}>View Transcript</Text>
+    </Pressable>
+)}
+
                     </View>
                   </View>
                 ))}
@@ -689,6 +768,27 @@ const styles = StyleSheet.create({
     backgroundColor: "#FEF2F2", 
     borderRadius: 14 
   },
+  notMetActionRow: {
+  flexDirection: "row",
+  gap: 10,
+},
+
+smallRecordBtn: {
+  flexDirection: "row",
+  backgroundColor: "#7C3AED",
+  paddingVertical: 14,
+  paddingHorizontal: 16,
+  borderRadius: 16,
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 6,
+},
+
+smallRecordText: {
+  fontWeight: "800",
+  color: "#fff",
+},
+
   editText: { color: "#1E4DB3", fontWeight: "800" },
   convertBtn: { 
     flexDirection: "row", 

@@ -108,7 +108,29 @@ export default function TabsLayout() {
           tabBarStyle: { display: "none" },
           }}
         />
-       
+       <Tabs.Screen
+  name="meeting-recording"
+  options={{
+    href: null,
+  }}
+/>
+
+<Tabs.Screen
+  name="mail-draft"
+  options={{
+    href: null,
+  }}
+/><Tabs.Screen
+  name="VisitingCardScanner"
+  options={{
+    href: null,
+  }}
+/><Tabs.Screen
+  name="meeting-transcription-status"
+  options={{
+    href: null,
+  }}
+/>
       </Tabs>
 
     

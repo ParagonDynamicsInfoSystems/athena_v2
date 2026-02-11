@@ -14,18 +14,18 @@ import {
   View
 } from "react-native";
 import aiApi from "../hooks/aiApi";
-
 const UPLOAD_LANG = "en";
+
 
 type StartResponse = {
   success?: boolean;
-  data?: {
-    job_id?: string;
-    jobId?: string;
-    message?: string;
-  } | null;
+  job_id?: string;
+  jobId?: string;
+  message?: string;
+  status?: string;
   error_message?: string | null;
 };
+
 
 export default function MeetingRecordingScreen() {
   const router = useRouter();
@@ -138,12 +138,13 @@ export default function MeetingRecordingScreen() {
       });
 
       const body: StartResponse = resp?.data ?? {};
-      const jobId = body?.data?.job_id ?? body?.data?.jobId;
+      const jobId = body?.job_id ?? body?.jobId;
+
 
       if (!jobId) {
         Alert.alert(
           "Upload Failed",
-          body?.error_message || body?.data?.message || "No job id returned"
+          body?.error_message || body?.message || "No job id returned"
         );
         return;
       }
