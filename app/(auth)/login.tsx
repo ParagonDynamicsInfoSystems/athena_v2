@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -256,6 +256,7 @@ export default function LoginScreen() {
 
           <TextInput
             placeholder="User name"
+            placeholderTextColor="#6B7280"
             style={styles.input}
             autoCapitalize="characters"
             value={empId}
@@ -265,6 +266,7 @@ export default function LoginScreen() {
           <View style={styles.passwordRow}>
             <TextInput
               placeholder="Password"
+              placeholderTextColor="#6B7280"
               style={styles.passwordInput}
               secureTextEntry={!showPassword}
               value={password}
@@ -301,7 +303,22 @@ const styles = StyleSheet.create({
   bg: { flex: 1, justifyContent: "center", paddingHorizontal: 20 },
   card: { backgroundColor: "#fff", borderRadius: 18, padding: 22 },
   title: { fontSize: 22, fontWeight: "700", textAlign: "center", marginBottom: 20 },
-  input: { borderWidth: 1, borderRadius: 12, padding: 14, marginBottom: 14 },
+ input: {
+  borderWidth: 1,
+  borderColor: "#D1D5DB",
+  borderRadius: 12,
+  padding: 14,
+  marginBottom: 14,
+  backgroundColor: "#FFFFFF",
+  color: "#000000", // typed text = black
+},
+
+passwordInput: {
+  flex: 1,
+  paddingVertical: 14,
+  color: "#000000", // typed text = black
+},
+
   passwordRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -310,7 +327,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     marginBottom: 20,
   },
-  passwordInput: { flex: 1, paddingVertical: 14 },
+ 
   showText: { color: "#1D4ED8", fontWeight: "600" },
   button: {
     backgroundColor: "#0F172A",
