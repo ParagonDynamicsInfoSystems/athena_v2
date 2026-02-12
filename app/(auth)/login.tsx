@@ -305,28 +305,30 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: "700", textAlign: "center", marginBottom: 20 },
  input: {
   borderWidth: 1,
-  borderColor: "#D1D5DB",
+  borderColor: "#000000",
   borderRadius: 12,
   padding: 14,
   marginBottom: 14,
   backgroundColor: "#FFFFFF",
-  color: "#000000", // typed text = black
+  color: "#000000",
 },
 
 passwordInput: {
   flex: 1,
   paddingVertical: 14,
-  color: "#000000", // typed text = black
+  color: "#000000",
 },
 
-  passwordRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    marginBottom: 20,
-  },
+passwordRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  borderWidth: 1,
+  borderColor: "#000000",
+  borderRadius: 12,
+  paddingHorizontal: 14,
+  marginBottom: 20,
+},
+
  
   showText: { color: "#1D4ED8", fontWeight: "600" },
   button: {
