@@ -13,28 +13,40 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      # 1. Setup Node
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 18
+          cache: 'npm'
 
+      # 2. Install dependencies
       - name: Install Dependencies
-        run: npm install
+        run: npm ci
 
+      # 3. Setup Java (required for Gradle)
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          distribution: temurin
+          java-version: 17
+          cache: gradle
 
+      # 4. Setup Android SDK
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      # 5. Make Gradle executable
       - name: Grant Gradle Permission
         run: chmod +x android/gradlew
 
+      # 6. Build Release APK
       - name: Build APK
         run: |
           cd android
-          ./gradlew assembleRelease
+          ./gradlew assembleRelease --no-daemon
 
+      # 7. Upload APK
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
