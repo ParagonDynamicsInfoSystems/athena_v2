@@ -111,6 +111,32 @@ async function handleEmailAiFlow(userId: string, router: any) {
     );
 
     const data = res.data;
+     if (!data.is_onboarded) {
+      try {
+        // 1️⃣ Get user info
+        const infoRes = await aiApi.get(
+          `/preferences/user-info?user_id=${encodeURIComponent(userId)}`
+        );
+
+        const userInfo = infoRes.data;
+
+        // 2️⃣ Begin onboarding
+        await aiApi.post(
+          `/preferences/begin-onboarding` +
+            `?user_id=${encodeURIComponent(userInfo.user_id)}` +
+            `&user_name=${encodeURIComponent(userInfo.user_name)}` +
+            `&email=${encodeURIComponent(userInfo.email_id)}`
+        );
+
+        // 3️⃣ Navigate to onboarding
+        router.replace("/(onboarding)");
+        return;
+      } catch (err) {
+        console.warn("Onboarding start failed", err);
+        router.replace("/(onboarding)");
+        return;
+      }
+    }
 
     if (data.google_services_connected || data.outlook_services_connected) {
       router.replace("/(tabs)");
