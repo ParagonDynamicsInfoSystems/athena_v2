@@ -13,38 +13,42 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # Node 20 (REQUIRED)
+      # Use Node 20 (required for new React Native)
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
+      # Install dependencies (ignores lock-file mismatch)
       - name: Install Dependencies
-        run: npm ci
+        run: npm install
 
-      # Expo prebuild (if Expo project)
+      # If this is an Expo project
       - name: Prebuild Expo
         run: npx expo prebuild --platform android
 
+      # Setup Java
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
-          cache: gradle
 
+      # Setup Android SDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      # Give gradle permission
       - name: Grant Gradle Permission
         run: chmod +x android/gradlew
 
+      # Build APK
       - name: Build APK
         run: |
           cd android
           ./gradlew assembleRelease --no-daemon
 
+      # Upload APK
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
