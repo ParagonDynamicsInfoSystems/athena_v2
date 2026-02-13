@@ -13,18 +13,20 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 1. Setup Node
+      # Node 20 (REQUIRED)
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
           cache: 'npm'
 
-      # 2. Install dependencies
       - name: Install Dependencies
         run: npm ci
 
-      # 3. Setup Java (required for Gradle)
+      # Expo prebuild (if Expo project)
+      - name: Prebuild Expo
+        run: npx expo prebuild --platform android
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -32,21 +34,17 @@ jobs:
           java-version: 17
           cache: gradle
 
-      # 4. Setup Android SDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # 5. Make Gradle executable
       - name: Grant Gradle Permission
         run: chmod +x android/gradlew
 
-      # 6. Build Release APK
       - name: Build APK
         run: |
           cd android
           ./gradlew assembleRelease --no-daemon
 
-      # 7. Upload APK
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
