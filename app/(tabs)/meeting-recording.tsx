@@ -195,14 +195,18 @@ export default function MeetingRecordingScreen() {
 
     setIsProcessing(true);
     try {
-      await rec.stopAndUnloadAsync();
+      // Capture status before unloading — getStatusAsync is invalid after stopAndUnloadAsync
       const status = await rec.getStatusAsync();
       setDurationMillis(status.durationMillis ?? null);
+
+      await rec.stopAndUnloadAsync();
       setIsRecording(false);
 
-      setTimeout(uploadRecording, 200);
+      await uploadRecording();
     } catch (e: any) {
       Alert.alert("Recording Error", e?.message ?? "Stop failed");
+    } finally {
+      if (mountedRef.current) setIsProcessing(false);
     }
   }, [uploadRecording]);
 

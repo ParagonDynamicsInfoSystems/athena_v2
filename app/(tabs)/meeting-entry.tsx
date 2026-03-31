@@ -342,8 +342,6 @@ export default function AddMeetingScreen() {
         }
       }
 
-      console.log("Posting meeting with payload:", payload);
-
       await aiApi.post("/calendar/post-meeting", payload, {
         params: { user_id: userId.toUpperCase() },
       });

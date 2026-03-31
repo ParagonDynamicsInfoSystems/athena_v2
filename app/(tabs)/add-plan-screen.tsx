@@ -177,14 +177,11 @@ export default function AddPlanScreen() {
     if (didPrefill.current === paramsKey) return;
     didPrefill.current = paramsKey;
 
-    console.log("Prefilling with params:", params);
-
     // Parse meeting JSON if provided (from calendar edit button)
     let meetingData: any = null;
     if (typeof params.meeting === "string" && params.meeting) {
       try {
         meetingData = JSON.parse(params.meeting);
-        console.log("Parsed meeting data:", meetingData);
       } catch (e) {
         console.error("Failed to parse meeting JSON", e);
       }
@@ -192,8 +189,6 @@ export default function AddPlanScreen() {
 
     // Prefer meeting data over individual params
     if (meetingData) {
-      console.log("Prefilling from meeting data");
-      
       // Customer - try multiple field names
       if (meetingData.customer) {
         setCustomerName(String(meetingData.customer));
@@ -213,77 +208,46 @@ export default function AddPlanScreen() {
       let dateSet = false;
       if (meetingData.date) {
         const d = parseDDMMYYYY(String(meetingData.date));
-        if (d) {
-          setDateObj(d);
-          dateSet = true;
-          console.log("Set date from meeting.date:", d);
-        }
+        if (d) { setDateObj(d); dateSet = true; }
       }
       if (!dateSet && params.date) {
         const d = parseDDMMYYYY(params.date as string);
-        if (d) {
-          setDateObj(d);
-          console.log("Set date from params.date:", d);
-        }
+        if (d) setDateObj(d);
       }
 
-      // Times - handle both from_time/to_time and plan_time
+      // Times
       if (meetingData.from_time) {
         const ft = parseHHMMSS(String(meetingData.from_time));
-        if (ft) {
-          setFromTime(ft);
-          console.log("Set from_time:", ft);
-        }
+        if (ft) setFromTime(ft);
       } else if (meetingData.plan_time) {
         const ft = parseHHMMSS(String(meetingData.plan_time));
-        if (ft) {
-          setFromTime(ft);
-          console.log("Set from_time from plan_time:", ft);
-        }
+        if (ft) setFromTime(ft);
       }
 
       if (meetingData.to_time) {
         const tt = parseHHMMSS(String(meetingData.to_time));
-        if (tt) {
-          setToTime(tt);
-          console.log("Set to_time:", tt);
-        }
+        if (tt) setToTime(tt);
       } else if (meetingData.plan_time) {
-        // Use plan_time + 1 hour for to_time if not available
         const ft = parseHHMMSS(String(meetingData.plan_time));
         if (ft) {
           const tt = new Date(ft);
           tt.setHours(tt.getHours() + 1);
           setToTime(tt);
-          console.log("Set to_time (plan_time + 1h):", tt);
         }
       }
 
       // Plan Mode
       if (meetingData.plan_mode !== undefined && meetingData.plan_mode !== null) {
-        const normalized = normalizePlanMode(meetingData.plan_mode);
-        setPlanMode(normalized);
-        console.log("Set plan_mode:", normalized);
+        setPlanMode(normalizePlanMode(meetingData.plan_mode));
       }
     } else {
-      // Fallback to individual params if no meeting JSON
-      console.log("Prefilling from individual params");
-      
-      if (params.customer_name) {
-        setCustomerName(String(params.customer_name));
-      }
-      if (params.customer_id) {
-        setSelectedCustomerId(String(params.customer_id));
-      }
-      if (params.activity) {
-        setActivity(String(params.activity));
-      }
+      // Fallback to individual params
+      if (params.customer_name) setCustomerName(String(params.customer_name));
+      if (params.customer_id) setSelectedCustomerId(String(params.customer_id));
+      if (params.activity) setActivity(String(params.activity));
 
       const d = parseDDMMYYYY(params.date as string);
-      if (d) {
-        setDateObj(d);
-        console.log("Set date from params:", d);
-      }
+      if (d) setDateObj(d);
 
       const ft = parseHHMMSS(params.from_time as string);
       if (ft) setFromTime(ft);

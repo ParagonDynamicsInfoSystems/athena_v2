@@ -5,13 +5,13 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Dimensions,
   ImageBackground,
   Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import aiApi from "../hooks/aiApi";
@@ -91,7 +91,7 @@ const getStatusBadgeStyle = (status?: string) => {
 /* ================= COMPONENT ================= */
 export default function CalendarScreen() {
   const router = useRouter();
-  const { width: screenWidth } = Dimensions.get("window");
+  const { width: screenWidth } = useWindowDimensions();
   const CONTAINER_PADDING = 32;
   const WEEK_WIDTH = screenWidth - CONTAINER_PADDING;
 
@@ -129,6 +129,28 @@ export default function CalendarScreen() {
     }, 100);
   }, [currentWeekCenter, WEEK_WIDTH]);
 
+  /* ================= TRANSCRIPT CHECK (outside fetchMeetings) ================= */
+  const checkTranscript = useCallback(async (prePlanId: string) => {
+    try {
+      const userId = await AsyncStorage.getItem("crmUserId");
+      if (!userId) return;
+
+      const resp = await aiApi.get("/meeting_transcription/status", {
+        params: { user_id: userId, pre_plan_id: prePlanId },
+      });
+
+      const data = resp?.data;
+      if (data?.job_id) {
+        setTranscriptMap((prev) => ({
+          ...prev,
+          [prePlanId]: { job_id: data.job_id, status: data.status },
+        }));
+      }
+    } catch {
+      // Non-critical — transcript status unavailable
+    }
+  }, []);
+
   /* ================= FETCH ================= */
   const fetchMeetings = useCallback(async (date: Date) => {
     const key = getKey(date);
@@ -149,54 +171,22 @@ export default function CalendarScreen() {
           user_id: userId,
         },
       });
-     const checkTranscript = async (prePlanId: string) => {
-  try {
-    const userId = await AsyncStorage.getItem("crmUserId");
-    if (!userId) return;
-
-    const resp = await aiApi.get("/meeting_transcription/status", {
-      params: {
-        user_id: userId,
-        pre_plan_id: prePlanId,
-      },
-    });
-
-    const data = resp?.data;
-
-    if (data?.job_id) {
-      setTranscriptMap((prev) => ({
-        ...prev,
-        [prePlanId]: {
-          job_id: data.job_id,
-          status: data.status,
-        },
-      }));
-    }
-  } catch (e) {
-    console.log("Transcript check failed:", e);
-  }
-};
 
       const calendar = resp.data?.calendar_meetings || {};
       const data = Array.isArray(calendar[key]) ? calendar[key] : [];
-      
+
       setMeetings(data);
-      
 
-data.forEach((m: Meeting) => {
-  if (m.pre_plan_id) {
-    checkTranscript(m.pre_plan_id);
-  }
-});
-
-
+      data.forEach((m: Meeting) => {
+        if (m.pre_plan_id) checkTranscript(m.pre_plan_id);
+      });
     } catch (err) {
       console.error("Fetch meetings error:", err);
       setMeetings([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [checkTranscript]);
 
   useFocusEffect(
     useCallback(() => {
@@ -293,9 +283,9 @@ data.forEach((m: Meeting) => {
     });
   };
 
+  // Only update state — useFocusEffect will trigger fetchMeetings via selectedDate dep
   const handleDateSelect = (date: Date) => {
     setSelectedDate(date);
-    fetchMeetings(date);
   };
 
   return (
@@ -514,7 +504,7 @@ data.forEach((m: Meeting) => {
                           </Pressable>
                           <Pressable 
                             style={styles.deleteBtn} 
-                            onPress={() => handleDelete(m.post_plan_id!, m.pre_plan_id)}
+                            onPress={() => handleDelete(m.post_plan_id ?? "", m.pre_plan_id)}
                             accessibilityLabel="Delete meeting"
                             accessibilityRole="button"
                           >

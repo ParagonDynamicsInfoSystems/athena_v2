@@ -12,7 +12,7 @@ export default function PostLogin() {
       try {
         const userId = await AsyncStorage.getItem("userId");
         if (!userId) {
-          router.replace("/login");
+          router.replace("/(auth)/login");
           return;
         }
 
@@ -23,11 +23,11 @@ export default function PostLogin() {
         if (res.data?.is_onboarded === true) {
           router.replace("/(tabs)");
         } else {
-          router.replace("./(onboarding)");
+          router.replace("/(onboarding)");
         }
       } catch (e) {
-        // fail-safe → allow app access
-        router.replace("/(tabs)");
+        // On error, send to login — do NOT grant access
+        router.replace("/(auth)/login");
       }
     };
 

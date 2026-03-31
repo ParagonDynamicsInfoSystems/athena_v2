@@ -110,9 +110,10 @@ export default function TargetSplitStep() {
       });
     }
 
-    // Fix floating-point drift
+    // Fix floating-point drift, clamped to valid range
     const drift = 100 - updated.reduce((a, b) => a + b, 0);
-    updated[updated.length - 1] += drift;
+    const lastIdx = updated.length - 1;
+    updated[lastIdx] = Math.max(0, Math.min(100, updated[lastIdx] + drift));
 
     setValues(updated);
   };
@@ -122,7 +123,10 @@ export default function TargetSplitStep() {
     try {
       setLoading(true);
       const userId = await AsyncStorage.getItem("userId");
-      if (!userId) return;
+      if (!userId) {
+        Alert.alert("Error", "User session expired. Please log in again.");
+        return;
+      }
 
       const payload =
         mode === "monthly"

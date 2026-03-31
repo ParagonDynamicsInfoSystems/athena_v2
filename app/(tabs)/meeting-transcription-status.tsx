@@ -47,6 +47,7 @@ export default function MeetingTranscriptionStatusScreen() {
 
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<any>(null);
+  const [pollError, setPollError] = useState(false);
 
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
@@ -102,6 +103,7 @@ export default function MeetingTranscriptionStatusScreen() {
       }, 5000);
     } catch (e) {
       stopPolling();
+      if (mountedRef.current) setPollError(true);
     }
   }, [job_id]);
 
@@ -115,6 +117,12 @@ export default function MeetingTranscriptionStatusScreen() {
     router.replace("/(tabs)/calendar");
   };
 
+  const onRetry = () => {
+    setPollError(false);
+    setProgress(0);
+    poll();
+  };
+
   /* ================= UI ================= */
   return (
     <SafeAreaView style={styles.safe}>
@@ -125,8 +133,19 @@ export default function MeetingTranscriptionStatusScreen() {
         <Text style={styles.headerTitle}>Meeting Insights</Text>
       </View>
 
-      {/* ================= PROCESSING UI ================= */}
-      {progress < 100 || !result ? (
+      {/* ================= ERROR UI ================= */}
+      {pollError ? (
+        <View style={styles.loading}>
+          <Text style={styles.errorText}>Analysis failed. Please try again.</Text>
+          <Pressable style={styles.retryBtn} onPress={onRetry}>
+            <Text style={styles.retryTxt}>Retry</Text>
+          </Pressable>
+          <Pressable style={[styles.retryBtn, { marginTop: 10, backgroundColor: "#64748B" }]} onPress={onBack}>
+            <Text style={styles.retryTxt}>Go Back</Text>
+          </Pressable>
+        </View>
+      ) : progress < 100 || !result ? (
+        /* ================= PROCESSING UI ================= */
         <View style={styles.loading}>
           <Text style={styles.progressText}>{progress}%</Text>
           <ActivityIndicator size="large" color="#1E4DB3" />
@@ -137,6 +156,7 @@ export default function MeetingTranscriptionStatusScreen() {
       ) : (
         /* ================= RESULT UI ================= */
         <ScrollView contentContainerStyle={styles.content}>
+
           <Card title="Meeting Summary">
             <Text style={styles.text}>
               {result.meetingSummary}
@@ -267,4 +287,7 @@ const styles = StyleSheet.create({
   text: { fontSize: 14, color: "#333", lineHeight: 20 },
   bold: { fontWeight: "700", color: "#15314a" },
   listItem: { marginBottom: 8 },
+  errorText: { fontSize: 16, color: "#DC2626", fontWeight: "700", marginBottom: 20, textAlign: "center" },
+  retryBtn: { backgroundColor: "#1E4DB3", paddingVertical: 12, paddingHorizontal: 32, borderRadius: 12 },
+  retryTxt: { color: "#fff", fontWeight: "800", fontSize: 15 },
 });

@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
     Alert,
     FlatList,
@@ -82,7 +82,11 @@ setPodList(mapPorts(res.data?.commonUtilityBean));
             try {
                 setLoading(true);
                 const res = await erpApi.get(`/Athena/app/airtariff/listseamob?id=${userId}`);
-                setList(res.data?.lQuotationBean || []);
+                const items = res.data?.lQuotationBean || [];
+                if (__DEV__ && items.length > 0) {
+                    console.log("TARIFF ITEM SAMPLE:", JSON.stringify(items[0], null, 2));
+                }
+                setList(items);
             } catch {
                 Alert.alert("Error", "Failed to load Tariffs");
             } finally {
@@ -93,17 +97,22 @@ setPodList(mapPorts(res.data?.commonUtilityBean));
     }, [userId]);
 
     const filteredList = useMemo(() => {
-        return list.filter(item => {
-            const polMatch = selectedPol
-  ? String(item.pol).toLowerCase() === String(selectedPol.code).toLowerCase()
-  : true;
+        const matchPort = (itemCode: any, itemName: any, selected: any) => {
+            if (!selected) return true;
+            const selCode = String(selected.code ?? "").toLowerCase().trim();
+            const selText = String(selected.text ?? "").toLowerCase().trim();
+            const ic = String(itemCode ?? "").toLowerCase().trim();
+            const iname = String(itemName ?? "").toLowerCase().trim();
+            // exact code match, or name contains selected text, or selected text contains item name
+            return ic === selCode ||
+                   ic === selText ||
+                   (iname.length > 0 && selText.length > 0 && (iname.includes(selText) || selText.includes(iname)));
+        };
 
-const podMatch = selectedPod
-  ? String(item.pod).toLowerCase() === String(selectedPod.code).toLowerCase()
-  : true;
-
-            return polMatch && podMatch;
-        });
+        return list.filter(item =>
+            matchPort(item.pol, item.polName, selectedPol) &&
+            matchPort(item.pod, item.podName, selectedPod)
+        );
     }, [list, selectedPol, selectedPod]);
 
     const renderItem = ({ item }: any) => (
@@ -191,11 +200,22 @@ const podMatch = selectedPod
 const SearchModal = ({ visible, data, title, onSelect, onClose }: any) => {
     const [search, setSearch] = useState("");
 
-    const filtered = (data || []).filter((i: any) => {
-    const itemText = String(i?.text || "").toLowerCase();
-    const searchText = String(search || "").toLowerCase();
-    return itemText.includes(searchText);
-});
+    // Reset search input every time the modal opens
+    const prevVisible = useRef(false);
+    useEffect(() => {
+        if (visible && !prevVisible.current) {
+            setSearch("");
+        }
+        prevVisible.current = visible;
+    }, [visible]);
+
+    const filtered = useMemo(() =>
+        (data || []).filter((i: any) => {
+            const itemText = String(i?.text || "").toLowerCase();
+            const searchText = String(search || "").toLowerCase();
+            return itemText.includes(searchText);
+        }),
+    [data, search]);
 
 
     return (

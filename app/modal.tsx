@@ -20,11 +20,8 @@ export default function ModalScreen() {
   const [checking, setChecking] = useState(true);
   const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
 
-  // 🔢 Current app version
-  const currentVersion =
-    Constants.expoConfig?.version ||
-    Constants.manifest?.version ||
-    "0.0.0";
+  // 🔢 Current app version (expoConfig is the correct modern API)
+  const currentVersion = Constants.expoConfig?.version ?? "0.0.0";
 
   useEffect(() => {
     checkAppVersion();

@@ -2,94 +2,35 @@ import axios from "axios";
 
 const aiApi = axios.create({
   baseURL: "https://sailwithcrm-athena.reportqube.com/api",
+  timeout: 15000,
   headers: {
     "Content-Type": "application/json",
     "Accept": "application/json",
   },
 });
 
-// Helper function to generate curl command
-const generateCurlCommand = (config: any) => {
-  const baseURL = config.baseURL || "";
-  const url = config.url || "";
-  let fullUrl = url.startsWith("http") ? url : `${baseURL}${url}`;
-  const method = (config.method || "GET").toUpperCase();
-  
-  // Add params to URL
-  if (config.params) {
-    const params = new URLSearchParams(config.params).toString();
-    if (params) {
-      fullUrl += `${fullUrl.includes("?") ? "&" : "?"}${params}`;
-    }
-  }
-  
-  let curl = `curl -X ${method} "${fullUrl}"`;
-  
-  // Add headers
-  if (config.headers) {
-    Object.entries(config.headers).forEach(([key, value]) => {
-      if (key.toLowerCase() !== "content-length") {
-        curl += ` \\\n  -H "${key}: ${value}"`;
-      }
-    });
-  }
-  
-  // Add data for POST/PUT/PATCH
-  if (config.data && (method === "POST" || method === "PUT" || method === "PATCH")) {
-    const dataStr = typeof config.data === "string" 
-      ? config.data 
-      : JSON.stringify(config.data);
-    curl += ` \\\n  -d '${dataStr}'`;
-  }
-  
-  return curl;
-};
-
-// Request interceptor for logging
+// Request interceptor — debug only
 aiApi.interceptors.request.use((config) => {
-  console.log("AI API REQUEST:", {
-    url: config.url,
-    method: config.method,
-    data: config.data,
-    headers: config.headers,
-  });
+  if (__DEV__) {
+    console.log("AI API REQUEST:", config.method?.toUpperCase(), config.url);
+  }
   return config;
 });
 
-// Response interceptor for error handling
+// Response interceptor — debug only
 aiApi.interceptors.response.use(
   (response) => {
-    console.log("AI API RESPONSE:", {
-      url: response.config.url,
-      status: response.status,
-      data: response.data,
-    });
+    if (__DEV__) {
+      console.log("AI API RESPONSE:", response.status, response.config.url);
+    }
     return response;
   },
   (error) => {
-    const config = error.config || {};
-    
-    // Generate and print curl command
-    const curlCommand = generateCurlCommand(config);
-    console.error("=".repeat(80));
-    console.error("AI API ERROR - CURL COMMAND:");
-    console.error(curlCommand);
-    console.error("=".repeat(80));
-    
-    // Print error response
-    console.error("AI API ERROR RESPONSE:", {
-      url: config.url,
-      method: config.method,
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      message: error.message,
-      responseData: error.response?.data,
-      responseHeaders: error.response?.headers,
-    });
-    
+    if (__DEV__) {
+      console.error("AI API ERROR:", error.response?.status, error.config?.url, error.message);
+    }
     return Promise.reject(error);
   }
 );
 
 export default aiApi;
-

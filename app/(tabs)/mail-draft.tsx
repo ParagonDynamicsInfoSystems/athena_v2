@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -9,6 +10,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import {
@@ -19,15 +21,38 @@ import {
 import RenderHTML from "react-native-render-html";
 import aiApi from "../hooks/aiApi";
 
-const USER_ID = "E0044";
-
 type MailProvider = "google" | "outlook" | null;
+
+/* ---------------- HEADER (outside component to avoid re-creation) ---------------- */
+function MailHeader({
+  editMode,
+  onBack,
+  onEdit,
+}: {
+  editMode: boolean;
+  onBack: () => void;
+  onEdit: () => void;
+}) {
+  return (
+    <View style={styles.header}>
+      <Pressable onPress={onBack}>
+        <Text style={styles.back}>←</Text>
+      </Pressable>
+      <Text style={styles.title}>Mail Draft</Text>
+      <Pressable onPress={onEdit}>
+        <Text style={styles.editIcon}>{editMode ? "💾" : "✏️"}</Text>
+      </Pressable>
+    </View>
+  );
+}
 
 export default function MailDraftPage() {
   const { post_plan_id } = useLocalSearchParams<{ post_plan_id?: string }>();
   const router = useRouter();
   const richRef = useRef<RichEditor>(null);
+  const { width: contentWidth } = useWindowDimensions();
 
+  const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [notGenerated, setNotGenerated] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -42,19 +67,26 @@ export default function MailDraftPage() {
   const [cc, setCc] = useState("");
   const [body, setBody] = useState("");
 
+  /* ---------------- LOAD USER ---------------- */
+  useEffect(() => {
+    AsyncStorage.getItem("crmUserId").then((id) => {
+      if (id) setUserId(id.toUpperCase());
+    });
+  }, []);
+
   /* ---------------- INIT ---------------- */
   useEffect(() => {
-    init();
-  }, [post_plan_id]);
+    if (userId) init();
+  }, [post_plan_id, userId]);
 
   const init = async () => {
-    if (!post_plan_id) return;
+    if (!post_plan_id || !userId) return;
 
     try {
       setLoading(true);
 
       const prefRes = await aiApi.get(
-        `preferences/is-onboarded?user_id=${USER_ID}`
+        `preferences/is-onboarded?user_id=${encodeURIComponent(userId)}`
       );
 
       const data = prefRes?.data;
@@ -80,11 +112,12 @@ export default function MailDraftPage() {
   /* ---------------- LOAD DRAFT ---------------- */
   const loadDraft = async (mailProvider: MailProvider) => {
     setNotGenerated(false);
+    const uid = encodeURIComponent(userId ?? "");
 
     const draftUrl =
       mailProvider === "google"
-        ? `calendar/draft/${post_plan_id}?user_id=${USER_ID}`
-        : `calendar/outlook/${post_plan_id}?user_id=${USER_ID}`;
+        ? `calendar/draft/${post_plan_id}?user_id=${uid}`
+        : `calendar/outlook/${post_plan_id}?user_id=${uid}`;
 
     try {
       const res = await aiApi.get(draftUrl);
@@ -107,12 +140,13 @@ export default function MailDraftPage() {
 
   /* ---------------- SAVE DRAFT ---------------- */
   const saveDraft = async (silent = false) => {
-    if (!draftId || !provider) return;
+    if (!draftId || !provider || !userId) return;
+    const uid = encodeURIComponent(userId);
 
     const editUrl =
       provider === "google"
-        ? `email-ai/google/edit-draft?user_id=${USER_ID}`
-        : `email-ai/outlook/edit-draft?user_id=${USER_ID}`;
+        ? `email-ai/google/edit-draft?user_id=${uid}`
+        : `email-ai/outlook/edit-draft?user_id=${uid}`;
 
     try {
       setSaving(true);
@@ -141,12 +175,13 @@ export default function MailDraftPage() {
 
   /* ---------------- SEND MAIL ---------------- */
   const sendMail = async () => {
-    if (!draftId || !provider) return;
+    if (!draftId || !provider || !userId) return;
+    const uid = encodeURIComponent(userId);
 
     const sendUrl =
       provider === "google"
-        ? `email-ai/google/send-draft?user_id=${USER_ID}`
-        : `email-ai/outlook/send-draft?user_id=${USER_ID}`;
+        ? `email-ai/google/send-draft?user_id=${uid}`
+        : `email-ai/outlook/send-draft?user_id=${uid}`;
 
     try {
       setSending(true);
@@ -167,27 +202,14 @@ export default function MailDraftPage() {
     }
   };
 
-  /* ---------------- HEADER ---------------- */
-  const Header = () => (
-    <View style={styles.header}>
-      <Pressable onPress={() => router.back()}>
-        <Text style={styles.back}>←</Text>
-      </Pressable>
-
-      <Text style={styles.title}>Mail Draft</Text>
-
-      <Pressable
-        onPress={editMode ? () => saveDraft(false) : () => setEditMode(true)}
-      >
-        <Text style={styles.editIcon}>{editMode ? "💾" : "✏️"}</Text>
-      </Pressable>
-    </View>
-  );
-
   /* ---------------- UI ---------------- */
   return (
     <SafeAreaView style={styles.safe}>
-      <Header />
+      <MailHeader
+        editMode={editMode}
+        onBack={() => router.back()}
+        onEdit={editMode ? () => saveDraft(false) : () => setEditMode(true)}
+      />
 
       {loading ? (
         <ActivityIndicator size="large" style={{ marginTop: 40 }} />
@@ -249,7 +271,7 @@ export default function MailDraftPage() {
               />
             </>
           ) : (
-            <RenderHTML contentWidth={360} source={{ html: body }} />
+            <RenderHTML contentWidth={contentWidth - 32} source={{ html: body }} />
           )}
 
           <View style={styles.footer}>

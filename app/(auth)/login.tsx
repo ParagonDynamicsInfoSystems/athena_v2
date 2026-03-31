@@ -92,7 +92,7 @@ async function registerNotificationToken(userId: string) {
 
 async function openOAuthInApp(authUrl: string, router: any) {
   try {
-    const redirectUri = AuthSession.makeRedirectUri({ useProxy: true });
+    const redirectUri = AuthSession.makeRedirectUri();
     await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
   } catch (e) {
     console.warn("OAuth error", e);
@@ -198,7 +198,7 @@ export default function LoginScreen() {
   useEffect(() => {
     const autoLogin = async () => {
       try {
-        const isLoggedIn = await AsyncStorage.getItem("isloggedIn");
+        const isLoggedIn = await SecureStore.getItemAsync("isloggedIn");
         const userId = await AsyncStorage.getItem("userId");
 
         if (isLoggedIn === "true" && userId) {
@@ -214,7 +214,9 @@ export default function LoginScreen() {
   }, []);
 
   useEffect(() => {
-    Notifications.requestPermissionsAsync().catch(() => {});
+    Notifications.requestPermissionsAsync().catch((e) => {
+      console.warn("Notification permission request failed:", e);
+    });
   }, []);
 
   /* 🔐 LOGIN */
@@ -240,8 +242,9 @@ export default function LoginScreen() {
       if (result?.success === true) {
         const user = result.userDetail;
 
+        // Store session flag in SecureStore; profile data in AsyncStorage
+        await SecureStore.setItemAsync("isloggedIn", "true");
         await AsyncStorage.multiSet([
-          ["isloggedIn", "true"],
           ["userId", user.userId],
           ["username", user.username],
           ["crmUserId", empId.toUpperCase()],

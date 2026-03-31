@@ -1,31 +1,33 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
+import * as SecureStore from "expo-secure-store";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Dimensions,
+  Alert,
   ImageBackground,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { BarChart, ProgressChart } from "react-native-chart-kit";
 import aiApi from "../hooks/aiApi";
 
 const bgImage = require("../../assets/images/bg.png");
-const screenWidth = Dimensions.get("window").width;
 
 type MetricType = "meetings" | "revenue";
 type PeriodType = "monthly" | "quarterly" | "yearly";
 
 export default function DashboardScreen() {
   const router = useRouter();
+  const { width: screenWidth } = useWindowDimensions();
 
   const [metric, setMetric] = useState<MetricType>("meetings");
   const [loading, setLoading] = useState(true);
@@ -143,46 +145,39 @@ export default function DashboardScreen() {
   }, [loadDashboardData]);
 
   /* ------------------ TARGET HELPERS ------------------ */
-  const getTargetObject = () => {
-    if (!targetData) return { current: 0, target: 1 };
+  const getTargetObject = useCallback(() => {
+    const EMPTY = { current: 0, target: 1 };
+    if (!targetData) return EMPTY;
+    if (activeTargetTab === "yearly") return targetData.yearly ?? EMPTY;
+    return targetData[activeTargetTab]?.["1"] ?? EMPTY;
+  }, [targetData, activeTargetTab]);
 
-    if (activeTargetTab === "yearly") {
-      return targetData.yearly;
-    }
-    return targetData[activeTargetTab]["1"];
-  };
-
-  const getTargetProgress = () => {
+  const targetProgress = useMemo(() => {
     const { current, target } = getTargetObject();
-    const percent = current / (target || 1);
-
+    const percent = (current ?? 0) / (target || 1);
     return {
       data: [percent > 1 ? 1 : percent],
       actualPercent: Math.round(percent * 100),
-      current: current.toLocaleString(),
-      target: target.toLocaleString(),
+      current: (current ?? 0).toLocaleString(),
+      target: (target ?? 0).toLocaleString(),
     };
-  };
+  }, [getTargetObject]);
 
-  const getTargetBarData = () => {
+  const targetBarData = useMemo(() => {
     const { current, target } = getTargetObject();
     return {
       labels: ["Current", "Target"],
       datasets: [{ data: [current || 0, target || 0] }],
     };
-  };
+  }, [getTargetObject]);
 
   /* ------------------ MEETING SPLIT ------------------ */
-  const getMeetingSplitData = () => {
-    if (!splitData) {
-      return { labels: [], datasets: [{ data: [] }] };
-    }
-
+  const meetingSplitData = useMemo(() => {
+    if (!splitData) return { labels: [], datasets: [{ data: [] }] };
     const d =
       activeSplitTab === "yearly"
         ? splitData.yearly
-        : splitData[activeSplitTab]["1"];
-
+        : splitData[activeSplitTab]?.["1"];
     return {
       labels: ["Direct", "Phone", "Business"],
       datasets: [
@@ -195,7 +190,7 @@ export default function DashboardScreen() {
         },
       ],
     };
-  };
+  }, [splitData, activeSplitTab]);
 
   /* ------------------ UI ------------------ */
   return (
@@ -251,16 +246,25 @@ export default function DashboardScreen() {
                 </View>
               </View>
              <TouchableOpacity
-  onPress={async () => {
-    try {
-      await AsyncStorage.clear(); 
-      // OR clear specific keys only (recommended):
-      // await AsyncStorage.multiRemove(["username", "crmUserId", "token"]);
-
-      router.replace("/(auth)/login");
-    } catch (e) {
-      console.error("Logout error:", e);
-    }
+  onPress={() => {
+    Alert.alert("Logout", "Are you sure you want to logout?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Logout",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await SecureStore.deleteItemAsync("isloggedIn");
+            await AsyncStorage.multiRemove([
+              "userId", "username", "crmUserId", "email",
+            ]);
+            router.replace("/(auth)/login");
+          } catch (e) {
+            console.error("Logout error:", e);
+          }
+        },
+      },
+    ]);
   }}
   style={styles.logoutBtn}
 >
@@ -362,7 +366,7 @@ export default function DashboardScreen() {
                   <View style={styles.progressSection}>
                     <View style={styles.progressChartContainer}>
                       <ProgressChart
-                        data={{ data: getTargetProgress().data }}
+                        data={{ data: targetProgress.data }}
                         width={140}
                         height={140}
                         strokeWidth={14}
@@ -379,7 +383,7 @@ export default function DashboardScreen() {
                       />
                       <View style={styles.progressCenter}>
                         <Text style={styles.progressPercent}>
-                          {getTargetProgress().actualPercent}%
+                          {targetProgress.actualPercent}%
                         </Text>
                       </View>
                     </View>
@@ -392,10 +396,10 @@ export default function DashboardScreen() {
                         <Ionicons name="checkmark-circle" size={16} color="#3B82F6" />
                         <Text style={styles.statLabel}>Current</Text>
                         <Text style={styles.statValue}>
-                          {getTargetProgress().current}
+                          {targetProgress.current}
                         </Text>
                       </LinearGradient>
-                      
+
                       <LinearGradient
                         colors={['#FEF3C7', '#FDE68A']}
                         style={styles.statBox}
@@ -403,24 +407,24 @@ export default function DashboardScreen() {
                         <Ionicons name="flag" size={16} color="#F59E0B" />
                         <Text style={styles.statLabel}>Target</Text>
                         <Text style={styles.statValue}>
-                          {getTargetProgress().target}
+                          {targetProgress.target}
                         </Text>
                       </LinearGradient>
-                      
+
                       <View style={[
                         styles.achievementBadge,
-                        { backgroundColor: getTargetProgress().actualPercent >= 100 ? '#D1FAE5' : '#FEF3C7' }
+                        { backgroundColor: targetProgress.actualPercent >= 100 ? '#D1FAE5' : '#FEF3C7' }
                       ]}>
-                        <Ionicons 
-                          name={getTargetProgress().actualPercent >= 100 ? "trophy" : "rocket"} 
-                          size={14} 
-                          color={getTargetProgress().actualPercent >= 100 ? "#10B981" : "#F59E0B"}
+                        <Ionicons
+                          name={targetProgress.actualPercent >= 100 ? "trophy" : "rocket"}
+                          size={14}
+                          color={targetProgress.actualPercent >= 100 ? "#10B981" : "#F59E0B"}
                         />
                         <Text style={[
                           styles.achievementText,
-                          { color: getTargetProgress().actualPercent >= 100 ? '#059669' : '#D97706' }
+                          { color: targetProgress.actualPercent >= 100 ? '#059669' : '#D97706' }
                         ]}>
-                          {getTargetProgress().actualPercent >= 100 ? "Achieved!" : "Keep Going!"}
+                          {targetProgress.actualPercent >= 100 ? "Achieved!" : "Keep Going!"}
                         </Text>
                       </View>
                     </View>
@@ -429,7 +433,7 @@ export default function DashboardScreen() {
                   {/* BAR CHART */}
                   <View style={styles.chartWrapper}>
                     <BarChart
-                      data={getTargetBarData()}
+                      data={targetBarData}
                       width={screenWidth - 64}
                       height={200}
                       fromZero
@@ -514,7 +518,7 @@ export default function DashboardScreen() {
 
                   <View style={styles.chartWrapper}>
                     <BarChart
-                      data={getMeetingSplitData()}
+                      data={meetingSplitData}
                       width={screenWidth - 64}
                       height={220}
                       fromZero

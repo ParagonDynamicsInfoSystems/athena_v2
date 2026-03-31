@@ -3,6 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
+    Alert,
     ImageBackground,
     StyleSheet,
     Text,
@@ -17,11 +18,12 @@ export default function TargetViewPreference() {
   const [selected, setSelected] = useState<"monthly" | "quarterly">("monthly");
 
   const savePreference = async () => {
-    // 1️⃣ Save preference
-    await AsyncStorage.setItem("targetViewMode", selected);
-
-    // 2️⃣ Navigate correctly (ABSOLUTE PATH)
-    router.replace("/(onboarding)/step5");
+    try {
+      await AsyncStorage.setItem("targetViewMode", selected);
+      router.replace("/(onboarding)/step5");
+    } catch (e) {
+      Alert.alert("Error", "Could not save preference. Please try again.");
+    }
   };
 
   return (

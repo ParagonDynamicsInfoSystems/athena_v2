@@ -55,31 +55,39 @@ export default function VisitingCardScannerScreen(): JSX.Element {
   const handleImageResult = (result: ImagePicker.ImagePickerResult) => {
     if (!result.canceled) {
       setImageUri(result.assets[0].uri);
-      setEditing(null); 
+      setEditing(null);
     }
   };
 
   async function openCamera() {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("Permission required", "Camera access is needed.");
-      return;
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission required", "Camera access is needed.");
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.7,
+        allowsEditing: false,
+      });
+      handleImageResult(result);
+    } catch (e: any) {
+      Alert.alert("Camera Error", e?.message ?? "Could not open camera");
     }
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.7,
-      allowsEditing: false, 
-    });
-    handleImageResult(result);
   }
 
   async function openGallery() {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.7,
-      allowsEditing: false,
-    });
-    handleImageResult(result);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.7,
+        allowsEditing: false,
+      });
+      handleImageResult(result);
+    } catch (e: any) {
+      Alert.alert("Gallery Error", e?.message ?? "Could not open gallery");
+    }
   }
 
   /* -------- API SCAN HANDLER -------- */
@@ -122,10 +130,13 @@ export default function VisitingCardScannerScreen(): JSX.Element {
   }
 
   useEffect(() => {
-    if (imageUri && userId && !editing) {
+    // Only auto-upload when a new image is selected and no results exist yet
+    if (imageUri && userId && editing === null) {
       uploadImageAndScan();
     }
-  }, [imageUri, userId]);
+    // editing is intentionally included so the stale closure is avoided;
+    // the `editing === null` guard prevents re-uploading when user edits fields
+  }, [imageUri, userId, editing]);
 
   /* -------- SAVE HANDLER -------- */
   async function saveScannedDetails() {
