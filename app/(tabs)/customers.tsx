@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -12,7 +13,6 @@ import {
   View,
 } from "react-native";
 import erpApi from "../hooks/erpApi";
-
 /* ===== BACKGROUND ===== */
 const bgImage = require("../../assets/images/bg.png");
 
@@ -40,20 +40,38 @@ export default function OutstandingViaSales() {
   }, []);
 
   const fetchOutstandingList = async () => {
-    try {
-      setLoading(true);
-      const response = await erpApi.get(
-        "/Athena/feeder/mobileApp/outstandingviasales",
-        { params: { salesid: "E0044" } }
-      );
-      setList(response.data?.outstandingList || []);
-    } catch (e) {
-      console.log("OUTSTANDING FETCH ERROR:", e);
+  try {
+    setLoading(true);
+
+    // ✅ GET ID FROM STORAGE
+    const crmUserId = await AsyncStorage.getItem("crmUserId");
+
+    if (!crmUserId) {
+      console.log("No CRM User ID found");
       setList([]);
-    } finally {
-      setLoading(false);
+      return;
     }
-  };
+
+    console.log("Using CRM ID:", crmUserId);
+
+    // ✅ API CALL
+    const response = await erpApi.get(
+      "/Athena/feeder/mobileApp/outstandingviasales",
+      {
+        params: {
+          salesid: crmUserId,
+        },
+      }
+    );
+
+    setList(response.data?.outstandingList || []);
+  } catch (e) {
+    console.log("OUTSTANDING FETCH ERROR:", e);
+    setList([]);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const renderItem = ({ item }: { item: OutstandingSale }) => (
     <View style={styles.card}>
