@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import * as SecureStore from "expo-secure-store";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -148,7 +148,7 @@ export default function AddPlanScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const userId = await AsyncStorage.getItem("crmUserId");
+        const userId = await SecureStore.getItemAsync("crmUserId");
         if (!userId) return;
 
         const res = await aiApi.get("/crm_data/customers", {
@@ -166,7 +166,7 @@ export default function AddPlanScreen() {
         setCustomers(list);
         setFilteredCustomers(list);
       } catch (error) {
-        console.error("Failed to load customers:", error);
+        if (__DEV__) console.error("Failed to load customers:", error);
       }
     })();
   }, []);
@@ -183,7 +183,7 @@ export default function AddPlanScreen() {
       try {
         meetingData = JSON.parse(params.meeting);
       } catch (e) {
-        console.error("Failed to parse meeting JSON", e);
+        if (__DEV__) console.error("Failed to parse meeting JSON", e);
       }
     }
 
@@ -295,7 +295,7 @@ export default function AddPlanScreen() {
 
       const userId =
         (typeof params.user_id === "string" && params.user_id) ||
-        (await AsyncStorage.getItem("crmUserId"));
+        (await SecureStore.getItemAsync("crmUserId"));
 
       if (!userId) {
         Alert.alert("Error", "User session expired");
@@ -353,7 +353,7 @@ export default function AddPlanScreen() {
         router.replace("/(tabs)/calendar");
       }
     } catch (e: any) {
-      console.error("Save error:", e);
+      if (__DEV__) console.error("Save error:", e);
       Alert.alert("Error", e?.response?.data?.message || e?.message || "Operation failed");
     } finally {
       setLoading(false);

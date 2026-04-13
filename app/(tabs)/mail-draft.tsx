@@ -1,5 +1,5 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -69,7 +69,7 @@ export default function MailDraftPage() {
 
   /* ---------------- LOAD USER ---------------- */
   useEffect(() => {
-    AsyncStorage.getItem("crmUserId").then((id) => {
+    SecureStore.getItemAsync("crmUserId").then((id) => {
       if (id) setUserId(id.toUpperCase());
     });
   }, []);

@@ -1,4 +1,3 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -84,7 +83,7 @@ async function registerNotificationToken(userId: string) {
       }
     );
   } catch (e) {
-    console.warn("Notification token registration failed", e);
+    if (__DEV__) console.warn("Notification token registration failed", e);
   }
 }
 
@@ -95,7 +94,7 @@ async function openOAuthInApp(authUrl: string, router: any) {
     const redirectUri = AuthSession.makeRedirectUri();
     await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
   } catch (e) {
-    console.warn("OAuth error", e);
+    if (__DEV__) console.warn("OAuth error", e);
   } finally {
     try {
       await WebBrowser.dismissBrowser();
@@ -132,7 +131,7 @@ async function handleEmailAiFlow(userId: string, router: any) {
         router.replace("/(onboarding)");
         return;
       } catch (err) {
-        console.warn("Onboarding start failed", err);
+        if (__DEV__) console.warn("Onboarding start failed", err);
         router.replace("/(onboarding)");
         return;
       }
@@ -178,7 +177,7 @@ async function handleEmailAiFlow(userId: string, router: any) {
       { cancelable: false }
     );
   } catch (e) {
-    console.warn("Email-AI flow failed", e);
+    if (__DEV__) console.warn("Email-AI flow failed", e);
     router.replace("/(tabs)");
   }
 }
@@ -199,7 +198,7 @@ export default function LoginScreen() {
     const autoLogin = async () => {
       try {
         const isLoggedIn = await SecureStore.getItemAsync("isloggedIn");
-        const userId = await AsyncStorage.getItem("userId");
+        const userId = await SecureStore.getItemAsync("userId");
 
         if (isLoggedIn === "true" && userId) {
           await registerNotificationToken(userId);
@@ -215,7 +214,7 @@ export default function LoginScreen() {
 
   useEffect(() => {
     Notifications.requestPermissionsAsync().catch((e) => {
-      console.warn("Notification permission request failed:", e);
+      if (__DEV__) console.warn("Notification permission request failed:", e);
     });
   }, []);
 
@@ -242,14 +241,12 @@ export default function LoginScreen() {
       if (result?.success === true) {
         const user = result.userDetail;
 
-        // Store session flag in SecureStore; profile data in AsyncStorage
+        // Store session flag & profile data in SecureStore (encrypted)
         await SecureStore.setItemAsync("isloggedIn", "true");
-        await AsyncStorage.multiSet([
-          ["userId", user.userId],
-          ["username", user.username],
-          ["crmUserId", empId.toUpperCase()],
-          ["email", user.email],
-        ]);
+        await SecureStore.setItemAsync("userId", user.userId);
+        await SecureStore.setItemAsync("username", user.username);
+        await SecureStore.setItemAsync("crmUserId", empId.toUpperCase());
+        await SecureStore.setItemAsync("email", user.email);
 
         await registerNotificationToken(user.userId);
 

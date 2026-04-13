@@ -1,5 +1,5 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -73,7 +73,7 @@ export default function MeetingTranscriptionStatusScreen() {
   const poll = useCallback(async () => {
     if (!job_id) return;
 
-    const userId = await AsyncStorage.getItem("crmUserId");
+    const userId = await SecureStore.getItemAsync("crmUserId");
     if (!userId) return;
 
     try {

@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
+import * as SecureStore from "expo-secure-store";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
@@ -124,7 +124,7 @@ export default function AddMeetingScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const userId = await AsyncStorage.getItem("crmUserId");
+        const userId = await SecureStore.getItemAsync("crmUserId");
         if (!userId) return;
 
         const res = await aiApi.get("/crm_data/customers", {
@@ -143,7 +143,7 @@ export default function AddMeetingScreen() {
         setCustomers(list);
         setFilteredCustomers(list);
       } catch (error) {
-        console.error("Failed to load customers:", error);
+        if (__DEV__) console.error("Failed to load customers:", error);
       }
     })();
   }, []);
@@ -157,7 +157,7 @@ export default function AddMeetingScreen() {
           meetingData = JSON.parse(params.meeting);
         }
       } catch (err) {
-        console.error("Failed to parse meeting data:", err);
+        if (__DEV__) console.error("Failed to parse meeting data:", err);
       }
 
       if (meetingData) {
@@ -209,7 +209,7 @@ export default function AddMeetingScreen() {
           }
         }
       } catch (error) {
-        console.error("Location error:", error);
+        if (__DEV__) console.error("Location error:", error);
         Alert.alert("Location Error", "Failed to get current location");
       } finally {
         setLocationLoading(false);
@@ -306,7 +306,7 @@ export default function AddMeetingScreen() {
 
     try {
       setLoading(true);
-      const userId = await AsyncStorage.getItem("crmUserId");
+      const userId = await SecureStore.getItemAsync("crmUserId");
       if (!userId) {
         Alert.alert("Error", "User session expired");
         return;
@@ -349,7 +349,7 @@ export default function AddMeetingScreen() {
       Alert.alert("✅ Success", "Meeting posted successfully");
       router.replace("/(tabs)/calendar");
     } catch (e: any) {
-      console.error("Post meeting error:", e);
+      if (__DEV__) console.error("Post meeting error:", e);
       Alert.alert("Error", e?.response?.data?.message || e?.message || "Failed to post meeting");
     } finally {
       setLoading(false);

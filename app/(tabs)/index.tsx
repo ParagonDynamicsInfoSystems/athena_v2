@@ -1,5 +1,4 @@
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
 import * as SecureStore from "expo-secure-store";
 import * as Location from "expo-location";
@@ -108,7 +107,7 @@ export default function DashboardScreen() {
   /* ------------------ LOAD USER ------------------ */
   useEffect(() => {
     const loadUser = async () => {
-      const name = await AsyncStorage.getItem("username");
+      const name = await SecureStore.getItemAsync("username");
       setUserName(name || "User");
     };
     loadUser();
@@ -118,7 +117,7 @@ export default function DashboardScreen() {
   const loadDashboardData = useCallback(async () => {
     try {
       setStatsLoading(true);
-      const userId = await AsyncStorage.getItem("crmUserId");
+      const userId = await SecureStore.getItemAsync("crmUserId");
       const uid = userId?.toUpperCase();
 
       const [splitRes, targetRes] = await Promise.all([
@@ -133,7 +132,7 @@ export default function DashboardScreen() {
       setSplitData(splitRes.data);
       setTargetData(targetRes.data);
     } catch (e) {
-      console.error("Dashboard Error:", e);
+      if (__DEV__) console.error("Dashboard Error:", e);
     } finally {
       setStatsLoading(false);
       setLoading(false);
@@ -255,12 +254,13 @@ export default function DashboardScreen() {
         onPress: async () => {
           try {
             await SecureStore.deleteItemAsync("isloggedIn");
-            await AsyncStorage.multiRemove([
-              "userId", "username", "crmUserId", "email",
-            ]);
+            await SecureStore.deleteItemAsync("userId");
+            await SecureStore.deleteItemAsync("username");
+            await SecureStore.deleteItemAsync("crmUserId");
+            await SecureStore.deleteItemAsync("email");
             router.replace("/(auth)/login");
           } catch (e) {
-            console.error("Logout error:", e);
+            if (__DEV__) console.error("Logout error:", e);
           }
         },
       },

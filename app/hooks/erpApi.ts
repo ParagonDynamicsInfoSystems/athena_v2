@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const erpApi = axios.create({
-  baseURL: "https://erp.athena-logistics.com:8080/",
+  baseURL: process.env.EXPO_PUBLIC_ERP_API_URL || "https://erp.athena-logistics.com:8080/",
   timeout: 15000,
   headers: {
     "Content-Type": "application/json",

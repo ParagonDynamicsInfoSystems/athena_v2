@@ -1,7 +1,7 @@
 // app/meeting-recording.tsx
 import { MaterialIcons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Audio } from "expo-av";
+import * as SecureStore from "expo-secure-store";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -51,7 +51,7 @@ export default function MeetingRecordingScreen() {
           playThroughEarpieceAndroid: false,
         });
       } catch (e) {
-        console.warn("Audio mode error:", e);
+        if (__DEV__) console.warn("Audio mode error:", e);
       }
     })();
 
@@ -110,8 +110,8 @@ export default function MeetingRecordingScreen() {
 
       setIsProcessing(true);
 
-      // Get user_id from AsyncStorage
-      const userId = await AsyncStorage.getItem("crmUserId");
+      // Get user_id from SecureStore
+      const userId = await SecureStore.getItemAsync("crmUserId");
       if (!userId) {
         Alert.alert("Auth Error", "User session expired");
         return;
@@ -156,7 +156,7 @@ export default function MeetingRecordingScreen() {
         )}`
       );
     } catch (e: any) {
-      console.error("Upload error:", e);
+      if (__DEV__) console.error("Upload error:", e);
       Alert.alert("Upload Failed", e?.message ?? "Network error");
     } finally {
       if (mountedRef.current) setIsProcessing(false);

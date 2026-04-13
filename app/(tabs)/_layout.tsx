@@ -26,7 +26,7 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="a-track"
           options={{
-            title: "A-Track",
+            title: "ERP Tracking",
             tabBarIcon: ({ color, size }) => (
               <MaterialCommunityIcons name="radar" size={size} color={color} />
             ),
@@ -76,7 +76,7 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="TrackShipmentScreen"
           options={{
-            title: "Track Shipment",
+            title: "Shipment Tracking",
             tabBarIcon: ({ color, size }) => (
               <MaterialCommunityIcons name="truck-fast-outline" size={size} color={color} />
             ),

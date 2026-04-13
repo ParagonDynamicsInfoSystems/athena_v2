@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
-import React, { JSX, useEffect, useState } from "react";
+import * as SecureStore from "expo-secure-store";
+import React, { JSX, useCallback, useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -45,7 +45,7 @@ export default function VisitingCardScannerScreen(): JSX.Element {
 
   useEffect(() => {
     const loadUserId = async () => {
-      const uid = await AsyncStorage.getItem("crmUserId");
+      const uid = await SecureStore.getItemAsync("crmUserId");
       if (uid) setUserId(uid.toUpperCase());
     };
     loadUserId();
@@ -53,9 +53,9 @@ export default function VisitingCardScannerScreen(): JSX.Element {
 
   /* -------- IMAGE SELECTION HANDLERS -------- */
   const handleImageResult = (result: ImagePicker.ImagePickerResult) => {
-    if (!result.canceled) {
-      setImageUri(result.assets[0].uri);
+    if (!result.canceled && result.assets?.[0]?.uri) {
       setEditing(null);
+      setImageUri(result.assets[0].uri);
     }
   };
 
@@ -67,8 +67,8 @@ export default function VisitingCardScannerScreen(): JSX.Element {
         return;
       }
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        quality: 0.7,
+        mediaTypes: ["images"],
+        quality: 1,
         allowsEditing: false,
       });
       handleImageResult(result);
@@ -80,8 +80,8 @@ export default function VisitingCardScannerScreen(): JSX.Element {
   async function openGallery() {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        quality: 0.7,
+        mediaTypes: ["images"],
+        quality: 1,
         allowsEditing: false,
       });
       handleImageResult(result);
@@ -91,29 +91,25 @@ export default function VisitingCardScannerScreen(): JSX.Element {
   }
 
   /* -------- API SCAN HANDLER -------- */
-  async function uploadImageAndScan() {
-    if (!imageUri || !userId) return;
-
+  const uploadImageAndScan = useCallback(async (uri: string, uid: string) => {
     setUploading(true);
     try {
-      const uriParts = imageUri.split('.');
-      const fileType = uriParts[uriParts.length - 1];
+      const uriParts = uri.split(".");
+      const fileType = uriParts[uriParts.length - 1] || "jpg";
 
       const formData = new FormData();
-      // @ts-ignore
       formData.append("image", {
-        uri: Platform.OS === "ios" ? imageUri.replace("file://", "") : imageUri,
+        uri: Platform.OS === "ios" ? uri.replace("file://", "") : uri,
         name: `scan.${fileType}`,
-        type: `image/${fileType === 'jpg' ? 'jpeg' : fileType}`,
-      });
+        type: `image/${fileType === "jpg" ? "jpeg" : fileType}`,
+      } as unknown as Blob);
 
       const resp = await aiApi.post(
-        `/scanner/visiting-card?user_id=${userId}`,
+        `/scanner/visiting-card?user_id=${uid}`,
         formData,
         { headers: { "Content-Type": "multipart/form-data" } }
       );
 
-      // Checking both common response patterns based on your logs
       const extractedData = resp.data?.data || resp.data?.response?.data;
 
       if (extractedData) {
@@ -122,28 +118,33 @@ export default function VisitingCardScannerScreen(): JSX.Element {
         throw new Error("API returned success but no data was found.");
       }
     } catch (e: any) {
-      console.error("Scan error:", e);
+      if (__DEV__) console.error("Scan error:", e);
       Alert.alert("Scan failed", "Could not process card. Please try a clearer photo.");
     } finally {
       setUploading(false);
     }
-  }
+  }, []);
 
+  /* Auto-upload when a new image is selected */
   useEffect(() => {
-    // Only auto-upload when a new image is selected and no results exist yet
-    if (imageUri && userId && editing === null) {
-      uploadImageAndScan();
+    if (imageUri && userId && !editing && !uploading) {
+      uploadImageAndScan(imageUri, userId);
     }
-    // editing is intentionally included so the stale closure is avoided;
-    // the `editing === null` guard prevents re-uploading when user edits fields
-  }, [imageUri, userId, editing]);
+  }, [imageUri, userId]);
 
   /* -------- SAVE HANDLER -------- */
   async function saveScannedDetails() {
     if (!editing || !userId) return;
     setSaving(true);
     try {
-      await aiApi.post(`/scanner/add-details?user_id=${userId}`, editing);
+      // Send only fields that have actual values
+      const payload: Record<string, any> = {};
+      for (const [key, val] of Object.entries(editing)) {
+        if (val !== null && val !== undefined && String(val).trim() !== "") {
+          payload[key] = val;
+        }
+      }
+      await aiApi.post(`/scanner/add-details?user_id=${userId}`, payload);
       Alert.alert("Success", "Contact saved successfully!");
       setImageUri(null);
       setEditing(null);
@@ -154,14 +155,22 @@ export default function VisitingCardScannerScreen(): JSX.Element {
     }
   }
 
-  const editFields: (keyof ScanResponse)[] = [
+  const ALL_FIELDS: (keyof ScanResponse)[] = [
     "person_name", "designation", "company_name", "phone_number", "email", "website", "address"
   ];
+
+  // Only show fields that have a value from the scan
+  const editFields = editing
+    ? ALL_FIELDS.filter((f) => {
+        const val = editing[f];
+        return val !== null && val !== undefined && String(val).trim() !== "";
+      })
+    : [];
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        
+
         <Text style={styles.title}>Card Scanner</Text>
 
         <View style={styles.card}>
@@ -184,7 +193,7 @@ export default function VisitingCardScannerScreen(): JSX.Element {
               <MaterialCommunityIcons name="camera" size={18} color="#fff" />
               <Text style={styles.btnText}>Camera</Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity style={[styles.cameraBtn, { backgroundColor: '#475569' }]} onPress={openGallery}>
               <MaterialCommunityIcons name="image-multiple" size={18} color="#fff" />
               <Text style={styles.btnText}>Gallery</Text>

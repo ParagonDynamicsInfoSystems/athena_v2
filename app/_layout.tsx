@@ -10,6 +10,7 @@ import {
 import NetworkLogger, {
   startNetworkLogging,
 } from "react-native-network-logger";
+import ErrorBoundary from "../components/ErrorBoundary";
 
 /* ================= ENV ================= */
 
@@ -31,14 +32,15 @@ export default function RootLayout() {
     if (!IS_PRODUCTION) {
       try {
         startNetworkLogging();
-        console.log("[NetworkLogger] started");
+        if (__DEV__) console.log("[NetworkLogger] started");
       } catch (e) {
-        console.warn("[NetworkLogger] failed", e);
+        if (__DEV__) console.warn("[NetworkLogger] failed", e);
       }
     }
   }, []);
 
   return (
+    <ErrorBoundary>
     <View style={{ flex: 1 }}>
       {/* ROUTES */}
       <Stack screenOptions={{ headerShown: false }}>
@@ -78,6 +80,7 @@ export default function RootLayout() {
         </>
       )}
     </View>
+    </ErrorBoundary>
   );
 }
 

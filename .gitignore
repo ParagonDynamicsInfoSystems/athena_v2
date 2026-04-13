@@ -39,3 +39,9 @@ yarn-error.*
 app-example
 
 /ios
+
+# Firebase config (keep only in android/app/)
+/google-services.json
+
+# Android release artifacts
+android/app/release/

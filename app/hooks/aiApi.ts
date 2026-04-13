@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const aiApi = axios.create({
-  baseURL: "https://sailwithcrm-athena.reportqube.com/api",
+  baseURL: process.env.EXPO_PUBLIC_AI_API_URL || "https://sailwithcrm-athena.reportqube.com/api",
   timeout: 15000,
   headers: {
     "Content-Type": "application/json",

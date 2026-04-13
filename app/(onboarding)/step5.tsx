@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import Slider from "@react-native-community/slider";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import { useEffect, useState } from "react";
 import {
     ActivityIndicator,
@@ -122,7 +123,7 @@ export default function TargetSplitStep() {
   const saveAndFinish = async () => {
     try {
       setLoading(true);
-      const userId = await AsyncStorage.getItem("userId");
+      const userId = await SecureStore.getItemAsync("userId");
       if (!userId) {
         Alert.alert("Error", "User session expired. Please log in again.");
         return;

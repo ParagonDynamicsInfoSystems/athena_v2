@@ -54,7 +54,7 @@ export default function WelcomeScreen() {
         showUpdateAlert(data);
       }
     } catch (e) {
-      console.warn("❌ Version check failed", e);
+      if (__DEV__) console.warn("Version check failed", e);
     }
   };
 

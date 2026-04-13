@@ -1,5 +1,5 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
 import aiApi from "./hooks/aiApi";
@@ -10,7 +10,7 @@ export default function PostLogin() {
   useEffect(() => {
     const checkOnboarding = async () => {
       try {
-        const userId = await AsyncStorage.getItem("userId");
+        const userId = await SecureStore.getItemAsync("userId");
         if (!userId) {
           router.replace("/(auth)/login");
           return;

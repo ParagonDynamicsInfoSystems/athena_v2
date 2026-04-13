@@ -40,7 +40,7 @@ export default function ModalScreen() {
 
       setChecking(false);
     } catch (e) {
-      console.warn("❌ Version check failed", e);
+      if (__DEV__) console.warn("Version check failed", e);
       setChecking(false);
     }
   };

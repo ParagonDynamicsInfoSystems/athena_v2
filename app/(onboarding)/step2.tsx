@@ -1,5 +1,5 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LinearGradient } from "expo-linear-gradient";
+import * as SecureStore from "expo-secure-store";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -40,7 +40,7 @@ export default function FiscalYearScreen() {
     try {
       setLoading(true);
 
-      const userId = await AsyncStorage.getItem("userId");
+      const userId = await SecureStore.getItemAsync("userId");
       if (!userId) {
         Alert.alert("Error", "User not found");
         return;

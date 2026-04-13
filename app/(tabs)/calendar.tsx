@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect, useRouter } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -132,7 +132,7 @@ export default function CalendarScreen() {
   /* ================= TRANSCRIPT CHECK (outside fetchMeetings) ================= */
   const checkTranscript = useCallback(async (prePlanId: string) => {
     try {
-      const userId = await AsyncStorage.getItem("crmUserId");
+      const userId = await SecureStore.getItemAsync("crmUserId");
       if (!userId) return;
 
       const resp = await aiApi.get("/meeting_transcription/status", {
@@ -156,7 +156,7 @@ export default function CalendarScreen() {
     const key = getKey(date);
     setLoading(true);
     try {
-      const userId = await AsyncStorage.getItem("crmUserId");
+      const userId = await SecureStore.getItemAsync("crmUserId");
       if (!userId) {
         Alert.alert("Error", "User session expired");
         setMeetings([]);
@@ -181,7 +181,7 @@ export default function CalendarScreen() {
         if (m.pre_plan_id) checkTranscript(m.pre_plan_id);
       });
     } catch (err) {
-      console.error("Fetch meetings error:", err);
+      if (__DEV__) console.error("Fetch meetings error:", err);
       setMeetings([]);
     } finally {
       setLoading(false);
@@ -238,7 +238,7 @@ export default function CalendarScreen() {
   const deleteMeeting = async (postPlanId: string, prePlanId?: string) => {
     try {
       setLoading(true);
-      const userId = await AsyncStorage.getItem("crmUserId");
+      const userId = await SecureStore.getItemAsync("crmUserId");
       if (!userId) {
         Alert.alert("Error", "User session expired");
         return;
@@ -253,7 +253,7 @@ export default function CalendarScreen() {
       await fetchMeetings(selectedDate);
       Alert.alert("Success", "Meeting deleted successfully");
     } catch (err) {
-      console.error("Delete error:", err);
+      if (__DEV__) console.error("Delete error:", err);
       Alert.alert("Error", "Failed to delete meeting");
     } finally {
       setLoading(false);

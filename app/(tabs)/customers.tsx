@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -44,15 +44,15 @@ export default function OutstandingViaSales() {
     setLoading(true);
 
     // ✅ GET ID FROM STORAGE
-    const crmUserId = await AsyncStorage.getItem("crmUserId");
+    const crmUserId = await SecureStore.getItemAsync("crmUserId");
 
     if (!crmUserId) {
-      console.log("No CRM User ID found");
+      if (__DEV__) console.log("No CRM User ID found");
       setList([]);
       return;
     }
 
-    console.log("Using CRM ID:", crmUserId);
+    if (__DEV__) console.log("Using CRM ID:", crmUserId);
 
     // ✅ API CALL
     const response = await erpApi.get(
@@ -66,7 +66,7 @@ export default function OutstandingViaSales() {
 
     setList(response.data?.outstandingList || []);
   } catch (e) {
-    console.log("OUTSTANDING FETCH ERROR:", e);
+    if (__DEV__) console.log("OUTSTANDING FETCH ERROR:", e);
     setList([]);
   } finally {
     setLoading(false);
@@ -87,16 +87,11 @@ export default function OutstandingViaSales() {
 
       <View style={styles.divider} />
 
-      {/* PRIMARY INFO GRID */}
+      {/* PRIMARY INFO */}
       <View style={styles.grid}>
         <View style={styles.gridItem}>
           <Text style={styles.label}>Sales Person</Text>
           <Text style={styles.value}>{item.salesperson || "-"}</Text>
-        </View>
-
-        <View style={styles.gridItem}>
-          <Text style={styles.label}>Balance TC</Text>
-          <Text style={styles.value}>{item.balancetc ?? "0.00"}</Text>
         </View>
       </View>
 
@@ -105,7 +100,7 @@ export default function OutstandingViaSales() {
         <Text style={styles.label}>Total Balance Amount</Text>
         <View style={styles.amountBadgePrimary}>
           <Text style={styles.amountTextPrimary}>
-            ${item.balanceamount?.toLocaleString() ?? "0.00"}
+            &#8377;{item.balanceamount?.toLocaleString("en-IN") ?? "0.00"}
           </Text>
         </View>
       </View>
@@ -115,21 +110,21 @@ export default function OutstandingViaSales() {
         <View style={styles.agingItem}>
           <Text style={styles.labelSmall}>Day 30</Text>
           <Text style={styles.agingValue}>
-            ${item.days30?.toLocaleString() ?? "0"}
+            &#8377;{item.days30?.toLocaleString("en-IN") ?? "0"}
           </Text>
         </View>
 
         <View style={[styles.agingItem, styles.borderX]}>
           <Text style={styles.labelSmall}>Day 65</Text>
           <Text style={styles.agingValue}>
-            ${item.days45?.toLocaleString() ?? "0"}
+            &#8377;{item.days45?.toLocaleString("en-IN") ?? "0"}
           </Text>
         </View>
 
         <View style={styles.agingItem}>
           <Text style={styles.labelSmall}>45-65 Days</Text>
           <Text style={styles.agingValue}>
-            ${item.days45to60?.toLocaleString() ?? "0"}
+            &#8377;{item.days45to60?.toLocaleString("en-IN") ?? "0"}
           </Text>
         </View>
       </View>

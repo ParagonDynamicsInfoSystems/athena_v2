@@ -1,4 +1,4 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import Slider from "@react-native-community/slider";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -26,7 +26,7 @@ export default function TargetSetupScreen() {
     try {
       setLoading(true);
 
-      const userId = await AsyncStorage.getItem("userId");
+      const userId = await SecureStore.getItemAsync("userId");
       if (!userId) {
         Alert.alert("Error", "User not found");
         return;
