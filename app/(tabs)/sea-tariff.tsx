@@ -28,11 +28,12 @@ const SeaTariffPage = () => {
 
     const [selectedPol, setSelectedPol] = useState<any>(null);
     const [selectedPod, setSelectedPod] = useState<any>(null);
-
+    
     const [polModal, setPolModal] = useState(false);
     const [podModal, setPodModal] = useState(false);
     const [userId, setUserId] = useState<string | null>(null);
-
+    const [details, setDetails] = useState<any>(null);
+    const [detailVisible, setDetailVisible] = useState(false);
     useEffect(() => {
         const loadUserId = async () => {
             try {
@@ -95,6 +96,30 @@ setPodList(mapPorts(res.data?.commonUtilityBean));
         };
         getList1();
     }, [userId]);
+    const fetchTariffDetails = async (item: any) => {
+    try {
+        setLoading(true);
+
+        const id = item.chargeid; // 🔥 KEY
+
+        const res = await erpApi.get(
+            `/Athena/feeder/mobileApp/tarifview?traiffid=${id}`
+        );
+
+        if (res.data?.success) {
+    setDetails(res.data.lQuotationBean?.[0]);
+    setDetailVisible(true);
+} else {
+    Alert.alert("Error", "No data found");
+}
+
+    } catch (err) {
+        console.log("DETAIL ERROR:", err);
+        Alert.alert("Error", "Failed to fetch details");
+    } finally {
+        setLoading(false);
+    }
+};
 
     const filteredList = useMemo(() => {
         const matchPort = (itemCode: any, itemName: any, selected: any) => {
@@ -116,14 +141,15 @@ setPodList(mapPorts(res.data?.commonUtilityBean));
     }, [list, selectedPol, selectedPod]);
 
     const renderItem = ({ item }: any) => (
+    <TouchableOpacity onPress={() => fetchTariffDetails(item)}>
         <View style={styles.card}>
             <Row label="POL Name" value={item.polName} />
             <Row label="POD Name" value={item.podName} />
             <Row label="Carrier" value={item.carrier} />
             <Row label="Service" value={item.serviceName} />
         </View>
-    );
-
+    </TouchableOpacity>
+);
     return (
         <ImageBackground source={BG_IMAGE} style={styles.flex1}>
             <SafeAreaView style={styles.flex1}>
@@ -189,7 +215,49 @@ setPodList(mapPorts(res.data?.commonUtilityBean));
                         title="Select POD"
                         onSelect={(v: any) => { setSelectedPod(v); setPodModal(false); }}
                         onClose={() => setPodModal(false)}
-                    />
+                    /><Modal visible={detailVisible} animationType="slide">
+    <SafeAreaView style={{ flex: 1, padding: 20 }}>
+
+        <Text style={{ fontSize: 20, fontWeight: "bold", marginBottom: 15 }}>
+            Tariff Details
+        </Text>
+
+        <View style={styles.card}>
+            <Row label="Charge No" value={details?.chargeNo} />
+            <Row label="Carrier" value={details?.carrier} />
+            <Row label="POL" value={details?.polName} />
+            <Row label="POD" value={details?.podName} />
+            <Row label="Validity" value={details?.validityDate} />
+            <Row label="Term" value={details?.term} />
+        </View>
+
+        <Text style={{ fontWeight: "bold", marginVertical: 10 }}>
+            Charges
+        </Text>
+
+        <FlatList
+            data={details?.chargeDtl || []}
+            keyExtractor={(_, i) => i.toString()}
+            renderItem={({ item }) => (
+                <View style={styles.card}>
+                    <Row label="Rate" value={item.rate} />
+                    <Row label="Qty" value={item.qty} />
+                    <Row label="Unit" value={item.unit} />
+                </View>
+            )}
+        />
+
+        <TouchableOpacity
+            style={styles.closeBtn}
+            onPress={() => setDetailVisible(false)}
+        >
+            <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                Close
+            </Text>
+        </TouchableOpacity>
+
+    </SafeAreaView>
+</Modal>
                 </View>
             </SafeAreaView>
         </ImageBackground>
