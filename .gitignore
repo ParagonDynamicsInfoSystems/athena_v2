@@ -45,3 +45,4 @@ app-example
 
 # Android release artifacts
 android/app/release/
+/android
